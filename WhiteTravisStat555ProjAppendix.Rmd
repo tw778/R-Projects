@@ -1,0 +1,154 @@
+---
+title: "Appendix for Statistical Reanalysis of Microarray Data From a Study of the Carcinogenic Cytokine MIF "
+author: "Travis White, travis_white@uri.edu"
+date: "November 8, 2018"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+# 1.0 Load Software
+
+```{r libraries, message=FALSE}
+require(hexbin)
+require(statmod)
+require(affy)
+require(limma)
+require(qvalue)
+require(Rcpp)
+require(arrayQualityMetrics)
+require(annotate)
+require(hgu133plus2.db)
+require(openssl)
+```
+
+# 1.1 Retrieve CEL Files
+
+```{r CELs}
+celPath="C:/Users/Administrator/Desktop/WhiteTravisStat555Project/oral"
+oralcels=ReadAffy(celfile.path=celPath)
+ph = oralcels@phenoData
+```
+
+# 1.2 Rename Samples/ Get Raw Expression Set Data from AffyBatch
+
+```{r newnames}
+sampleNames(oralcels)=
+  paste(rep(c("normal","tumor"),each=1),
+        rep(c(1:6),each=2))
+  sampleNames(oralcels)
+
+# Get Raw Data from AffyBatch
+exraw=exprs(oralcels[,1:12])
+exrawlog=log2(exraw)
+```
+
+# 1.3 Hexplot Before Normalization
+
+```{r hexplotbefore}
+hexplom(exrawlog[,c(1,3,5,7,9,11)])
+hexplom(exrawlog[,c(2,4,6,8,10,12)])
+
+```
+
+# 1.4 Quality Assessment Before Normalization
+
+```{r QAbefore}
+arrayQualityMetrics(expressionset = oralcels[,1:12],
+outdir = "Report_for_oralcels_QCbefore",
+force = TRUE,
+do.logtransform = TRUE)
+
+```
+
+# 1.5 Normalize using RMA
+
+```{r RMA, message=FALSE}
+
+oral.rma = rma(oralcels)
+oral.matrix = exprs(oral.rma)
+
+```
+
+# 1.6 Scatterplot Matrix After Normalization
+
+```{r hexplotafter}
+hexplom(oral.matrix[,c(1,3,5,7,9,11)])
+hexplom(oral.matrix[,c(2,4,6,8,10,12)])
+```
+
+# 1.7 Quality Assessment After Normalization
+
+```{r QAafter}
+
+arrayQualityMetrics(expressionset = oral.rma[,1:12],
+outdir = "Report_for_oralcels_QCafter",
+force = TRUE)
+
+```
+
+# 1.8 Create Paired Design Matrix and Fit Linear Model
+
+```{r contrasts}
+
+ph@data[ ,2] = c("Normal","Tumor","Normal","Tumor","Normal","Tumor","Normal","Tumor","Normal","Tumor","Normal","Tumor")
+colnames(ph@data)[2]="Source"
+ph@data[ ,3] = c("patient1","patient1","patient2","patient2","patient3","patient3", "patient4","patient4", "patient5","patient5", "patient6","patient6")
+colnames(ph@data)[3]="Patient"
+ph@data
+
+groupsP = ph@data$Patient 
+groupsT = ph@data$Source
+fp = factor(groupsP,levels=c("patient1","patient2","patient3","patient4","patient5","patient6"))
+ft = factor(groupsT,levels=c("Normal","Tumor"))
+
+paired.design = model.matrix(~ fp + ft)
+data.fit = lmFit(oral.rma,paired.design)
+
+oral.data.fit.eb = eBayes(data.fit)
+
+
+```
+
+
+# 1.9 Annotate with Gene IDs
+
+```{r gene ids}
+
+   meset<- oral.rma
+   ID <- featureNames(meset)
+   Symbol <- getSYMBOL(ID,"hgu133plus2.db")
+   fData(meset) <- data.frame(ID=ID,Symbol=Symbol)
+   
+```
+
+
+# 2.0 Adjust for Multiple Testing and Calculate Pi_0
+
+```{r qvals}
+
+pvals=oral.data.fit.eb$p.value
+qvals=qvalue(pvals)
+qvals1=qvals$qvalues
+qvaltab <- c(qvals1)
+probeids <- oral.data.fit.eb$coefficients
+probeids1 <- rownames(probeids)
+qvalprob <- data.frame(probeids1, qvals1,Symbol)
+lowesttenv <- qvalprob[order(qvals1),]
+qvals$pi0
+```
+
+
+
+# 2.1 Volcano Plot
+
+```{r Volcano Plot}
+name = "Volcanooral.jpg"
+jpeg(name)
+volcanoplot(oral.data.fit.eb,coef=1,highlight=20)
+dev.off()
+```
+
+
+

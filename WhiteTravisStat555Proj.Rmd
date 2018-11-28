@@ -1,0 +1,301 @@
+---
+title: "Statistical Reanalysis of Microarray Data From a Study of the Carcinogenic Cytokine *MIF*"
+author: "Travis White, travis_white@uri.edu"
+date: "November 8, 2018"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+# **Abstract**
+
+Microarray technology allows for scientists to measure the extent to which certain genes are activated or deactivated in a cell. Throughout the 1990's and early 2000's, microarrays saw extensive use in science and medicine[1]. However, in recent years, they became somewhat obsolete due to emerging technologies such as RNA-seq.Though currently out of favor, gene expression analysis via microarray still holds a unique niche in current molecular biology. Unfortunately, in 2008, Ioannidis and others conducted a study regarding the reproducibility of microarray publications and found that the vast majority of published journals using microarray technology have results that cannot be reproduced[6]. Since microarrays are still in use and there is a large number of previously published studies, it is still important to verify the methods and claims of studies using microarray technology.  
+
+The purpose of this project is to reanalyze data from a published journal in which the authors used microarray data to form their conclusions. Doing so will serve two purposes: the first being that it will outline the steps to calculate differentially expressed genes using the popular LIMMA method, and the second is that it will test the validity of the claims made by the authors of the original study. The journal that was chosen to be reanalyzed was a study of the carcinogenic cytokine *MIF*[2]. Researchers in this study used qPCR and microarray data to prove that over-expression of the *MIF* gene results in differential expression of other carcinogenic genes previously described in the literature. They used the Ingenuity Pathway Analysis software package (IPA, Qiagen Valencia, CA, USA) to conduct their differential expression analysis and found that genes *MMP1* and *PTSG2* (of the *MIF* pathway) were differentially expressed in human and murine oral squamous cell carcinoma tumor samples[2]. Using the publicly available data for this study, this reanalysis also found *MMP1* and *PTSG2* to be differentially expressed, validating the claims made in the journal.
+
+
+# **Introduction**
+
+During a 2016 survey, *Nature* polled 1576 scientists and asked multiple questions regarding the current status of reproducibility in science. This survey found that over fifty percent of the respondents thought that there was a significant and ongoing reproducibility crisis[7].  Respondents penned "selective reporting", "pressure to publish", and "low statistical power" as the top factors to blame for this crisis. These results are certainly troubling for anyone wishing to review and cite scientific literature!
+	
+Experiments in molecular biology can be especially difficult to replicate due to the nature of the subjects of interest. The molecules in question are not visible to the naked eye and the instruments that analyze them usually produce cryptic results that need to be properly interrogated with appropriate statistical methods. It is not difficult for one to unintentionally misinterpret molecular results; it is also easy for a deceitful individual to willfully alter or misreport findings in order to pursue a vested interest. For these reasons, it is imperative that the scientific community vigorously demands that all current and future publications are transparent in the reporting of their methods so that the experiments and data can be accurately reproduced.
+	
+Fortunately for bioinformaticians, it is relatively straightforward to retrieve and reanalyze publicly available data sets from the comfort of their own homes. Ioannidis et al selected eighteen journals that used microarray data and set out to reproduce the same results found by the original researchers. Sadly, they were unable to reproduce similar results in ten of eighteen of the studies due to a lack of properly listed methods and unavailable data sets[6]. They were able to reproduce the results of the other eight studies but a number of the cases in question had improperly prepared or displayed results and annotations[6]. These findings are discouraging because studies with results that cannot be reproduced have diminished or no scientific credibility.
+	
+The aim of this project is to address the aforementioned reproducibility crisis by outlining the steps that one must take to properly reanalyze publicly available microarray datasets. A published journal that used microarray data to prove differential gene expression that results in human oral carcinogenesis was selected for this project[2]. The author of this project retrieved and processed the publicly available microarray data for the selected study and the findings were compared to those in the original paper.
+
+# **Background**
+
+Scientific Journal To Be Reanalyzed: [Deletion of macrophage migration inhibitory factor inhibits murine oral carcinogenesis: Potential role for chronic pro-inflammatory immune mediators.](Oghumu S, Knobloch TJ, Terrazas C, et al. Deletion of macrophage migration inhibitory factor inhibits murine oral carcinogenesis: Potential role for chronic pro-inflammatory immune mediators. Int J Cancer. 2016;139(6):1379-90.)
+
+A cytokine is defined as a protein that influences the behavior of other cells when it is secreted[9]. Oghumu et al hypothesized that the known carcinogenic cytokine MIF is also involved in oral carcinogenesis in mice and humans[2]. MIF stands for macrophage migration inhibitory factor and it is a protein that is produced in both immune and non-immune cells[2]. It was one of the first cytokines to be described and is well-established in the literature as a carcinogen in numerous sites throughout the body such as the liver, lungs, breast, and colon[2][8]. **Figure one** depicts known genes that are affected by MIF up-regulation.
+
+<a href="https://imgbb.com/"><img src="https://image.ibb.co/i7KHnq/pic.jpg" alt="pic" border="0"></a>
+
+[**Figure One**: Genes Controlled by Up-Regulated MIF, Oghumu et al 2016[2]]
+
+To prove their theory, Oghumu et al subjected two groups of eight mice to equal treatments of 4-nitroquinoline-1-oxide laced drinking water for sixteen weeks. Eight mice were of the wild type variety and the rest were MIF knockout mice; they were all of roughly the same age[2]. 4-nitroquinoline-1-oxide is a known carcinogenic chemical that induces oral squamous cell carcinomas in the tissue of mice who drink it[2]. After the sixteen week treatment period elapsed, these mice were sacrificed and their tumors were resected and examined microscopically for diagnosis and grading by a pathologist.
+
+The mice in this study were not the only subjects that were tested-- six human patients with a recent diagnosis of squamous cell carcinoma of oral cavity underwent tissue biopsies. Their tumors were directly sampled, and macroscopically normal oral tissue was also sampled from the same patients[2]. This gives us twelve total samples: one normal tissue biopsy and one tumor biopsy from each patient. It is important to note that the tissue harvested in these biopsies was the only tissue that underwent microarray analysis; murine tissue was examined microscopically and with quantitative PCR[2].
+
+Researchers used a variety of software and statistical methods to analyze the data that was generated from the collected tissue. Microarray data was normalized using the Robust Multi-Array Average Expression Measure (RMA)[12][14]. The normalized microarray data was processed using Ingenuity Pathway Analysis software (IPA, Qiagen Valencia, CA, USA). IPA finds patterns in the gene expression input and compares them to entries in a database of known biological pathways. ANOVA with Tukey's *post hoc* test was used to compare MIF expression values to the clinicopathologic parameters of the tissue samples (i.e. smoking status, gender, alcohol use, etc.)[2].
+
+After all of the data was collected and the results were computed, the researchers in this study concluded that MIF upregulation was indeed responsible for oral carcinogenesis[2]. The knockout mice had fewer and less invasive tumors than the wild type mice. In the human samples, IPA analysis showed numerous genes that were previously associated with MIF upregulation (*MMP1* and *PTGS2*)-- these results were validated by RTPCR (see **Figure One**)[2]. No significant associations between gender, alcohol use, or smoking status could be made[2].
+
+
+# **Data**
+
+Raw microarray data for this study is available in the following link: [GEO Accession Number 74530](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE74530)
+
+
+# **Methods**
+
+Below is a general procedural list describing how one can perform differential gene expression analysis on microarray data. There are more options available in terms of statistical tests and software; this is just one popular approach. Each of the steps will be explained in more detail in the sections that follow[15].
+
+1. Locate, download, and unzip *.tar* file from Gene Expression Omnibus
+
+2. Download R/Rstudio and load appropriate software (See "**Software**")
+
+3. Load CEL files into R and extract expression data
+
+4. Quality Control
+
+5. Normalization 
+
+6. Differential Expression Analysis 
+
+7. Adjust for Multiple Testing
+
+8. Visualize Results
+
+9. Annotation/Interpretation
+
+
+# **Software**
+
+The following R packages were used to reanalyze the paper in question:
+
+**R/Rstudio**
+Version used: 3.5.1
+
+R/Rstudio is open source software that contains packages used for statistical analysis. R Markdown was used to create this project.[16]
+
+**affy**
+Version used: 1.58.0
+
+affy is an R package that contains tools used to to process Affymetrix microarray data. It contains the function used to load CEL files into R and also the RMA function that is used to normalized the data.[12]
+
+**LIMMA**
+Version used: 3.36.5
+
+LIMMA is an R package that contains tools to fit a linear model to RNAseq and microarray data to calculate differential gene expression.[4][5]
+
+**qvalue**
+Version used: 2.12.0
+
+qvalue is an R package that calculates Storey's q-values for multiple testing adjustment.[17]
+
+**arrayQualityMetrics**
+Version used: 3.36.0
+
+arrayQualityMetrics is an R package that takes an Affybatch as input and outputs html files with all of the necessary plots and images used in microarray quality assurance.[3]
+
+# **Quality Control and Normalization**
+
+Before analysis of expression data may proceed, it is crucial that a thorough quality assessment is performed on the raw and normalized expression data. It is possible that the expression data is flawed from a defective microarray or some other technical factor.[15]
+
+**View False Color Representations of Arrays**
+
+<a href="https://ibb.co/eS2bn0"><img src="https://preview.ibb.co/gsuBLL/beforefalsecolor.png" alt="beforefalsecolor" border="0"></a>
+
+{**Figure 2**: False Color Representation produced by arrayQualityMetrics function[3].} 
+
+Figure 2 represents a false color representation of the eight microarrays (of twelve) with the highest and lowest Fourier coefficients. False color should be evenly distributed across the image in each array (minimal clumping and blank areas)[3][15]. It appears that the arrays were not defective. 
+
+**Hexplot Analysis**
+
+<a href="https://ibb.co/k1RafL"><img src="https://preview.ibb.co/cZuiZf/normal-before.png" alt="normal-before" border="0"></a>
+
+[**Figure 3** Scatterplot matrices of normal (left) and tumor(right) raw expression data.]
+
+Figure 3 depicts two scatterplot matrices of raw expression data for our normal and tumor samples-- they were generated with the R function **hexplom**[18]. Samples that are satisfactory for statistical analysis should have a linear distribution, i.e. the majority of points are tightly focused around the line of y=x[15]. As you can see in Figure 3, most of the scatterplots do not have a linear distribution, and it is clear that these sets of expression data are in need of normalization. Appendix 1.3 contains the code chunk detailing how to make a scatterplot matrix appropriately-- the two matrices are comparing the groups of biological replicates to one another, i.e. normal tissue versus normal tissue and tumor tissue versus tumor tissue. See Figure 6 for scatterplots generated after normalization.
+
+**MA Plot Analysis**
+
+<a href="https://ibb.co/nEVOZf"><img src="https://preview.ibb.co/i8bafL/ma-before.png" alt="ma-before" border="0"></a>
+
+[**Figure 4**: MA Plots of raw expression data]
+
+Figure 4 contains MA plots generated by the arrayQualityMetrics function[3]. 
+
+Where:
+M = log2(I1) - log2(I2)
+A = 1/2 (log2(I1)+log2(I2))
+D = Hoeffing's D-Statistic
+
+An ideal MA plot should have the majority of points focused around M=0 and should there should be no trend between A and M[3][15]. A value of D greater than 0.15 indicates an outlier plot; the highest value of D is held by array 8 and at D=0.10. However, there is still some deviation in the trend away from M=0 which should be eliminated by normalization. See Figure 7 to view the effects of normalization on the MA plots.
+
+**Relative Log Expression Boxplot**
+
+<a href="https://imgbb.com/"><img src="https://image.ibb.co/nGokVL/boxplot-before.png" alt="boxplot-before" border="0"></a>
+
+[**Figure 5** Relative Log Expression Boxplot]
+
+Figure 5 is a boxplot of the relative log expression of each array. Each array should be centered around zero or it should be considered an outlier[3][15]. Array 7 appears to have some extreme outliers but its median is close to zero. These plots all appear to be satisfactory for further evaluation.
+
+**Normalization**
+
+Normalization was conducted using Robust Multi-Array Average expression measure (RMA) [14]. RMA computes an expression measure that is background adjusted and takes the log2(perfect matches)[12][14]. The rma() function is part of the affy() R package[12]. rma() takes an AffyBatch and converts it into an ExpressionSet. It is important to note that the input of rma() is an AffyBatch and the output of the function is an ExpressionSet. An AffyBatch is generated from the .CEL files (downloaded from GEO) using the celPath command (see appendix 1.1 for code). The ExpressionSet output can then extracted into a vector using the exprs() function (see Appendix 1.2 for code). This ExpressionSet is already in log2 form from the rma() function and is ready for further processing. Please see Appendix 1.5 for the code performing RMA normalization for this project.
+
+
+**Scatterplot Matrices after Normalization**
+
+<a href="https://ibb.co/i3tuqL"><img src="https://preview.ibb.co/deoSAL/scatterplotafter.png" alt="scatterplotafter" border="0"></a>
+
+[**Figure 6** Scatterplot Matrices after RMA normalization]
+
+Figure 6 is a scatterplot matrix (made with hexbin[16]) of the normal and tumor ExpressionSet generated by the rma() function. A comparison of Figure 4 to Figure 6 makes the effects of the rma() function apparent. All of the plots are centered around y=x and it is clear that these data are ready to be fit to a linear model.
+
+**MA Plots after Normalization**
+
+<a href="https://ibb.co/myiDH0"><img src="https://preview.ibb.co/b4a4Pf/MAafter.png" alt="MAafter" border="0"></a>
+
+[**Figure 7** MA plots after normalization]
+
+Figure 7 contains the MA plots generated by the arrayQualityMetrics[3] function on the RMA normalized expression data. It is apparent that an increased number of points lie close to the line of M=0 and there is no relationship between M and A values.
+
+
+# **Differential Expression Analysis**
+
+After one is convinced that their expression data was collected and normalized properly, they may proceed with differential expression analysis. There are numerous methods for computing differential expression from microarray data. Some methods are considered to be more effective than others and are used more frequently. We will use the LIMMA[4][5] method to calculate the differential gene expression from the microarray data used in this project.
+
+
+**LIMMA**
+
+LIMMA stands for "linear models for microarray data" and it is a Bioconductor R package[4][5]. This package contains all of the necessary tools to fit microarray expression data to a linear model and calculate differntial gene expression; it can also be used on RNA-seq and RT PCR data. 
+
+A single microarray experiment contains tens of thousands of tests within it-- this necessitates a statistical test that can combine all of the sub-experiments within to form a larger picture from which interpretations can be made. To do this, LIMMA uses an empirical Bayes method that shares information between genes to compute a global variance that increases the degrees of freedom for tests between genes[4][5][19]. 
+
+LIMMA can be used on one or two-color microarray data. In this case, we are working with two-color microarray data and so LIMMA will compute log-fold-change. Based on the data in question, it is important for the investigator to determine which type of t-test LIMMA needs to use. Here we have a pairing effect because each test is between tissue respective to each patient; we need to use a paired t-test method instead of a two sample t-test method.
+
+
+**Prepare a Design Matrix**
+
+After the parameters of the tests have been established, the first step in the LIMMA process is to form a design matrix[4][5]. A design matrix identifies what type of replicate each data source is. We will use the paired design method since each patient has a sample of both normal tissue and tumor tissue. If our data were not paired, we would use the design.matrix() function and also create a contrast matrix instead[15].
+
+It is easy to form a design matrix for the expression data of this study because we are only comparing two groups of tissue. First, the phenodata from the Affybatch is extracted and altered appropriately. To access the phenodata of an Affybatch, one must use the @ symbol instead of the $ symbol to access additional options. It is critical that the samples are renamed correctly or we will not be able to proceed. Next, the paired.design()[4][5] function is called to form the design matrix using the altered phenodata-- please see appendix 1.8 for the code used to do this for this project. **Figure 8** depicts the design matrix that was prepared for this project; each "1" tells LIMMA which type of sample is on each microarray.
+
+<a href="https://ibb.co/hPPjNA"><img src="https://preview.ibb.co/c0KJhA/designmatrixpaired.png" alt="designmatrixpaired" border="0"></a>
+
+[**Figure 8** The design matrix prepared for this project. Note: this data frame is two pages(the last two samples are on the second page and not shown here).]
+
+**Fit Linear Model and Apply Empirical Bayes Moderated t-test**
+
+Once the design matrix is prepared, the next step in LIMMA is to fit a linear model. This is readily done by inputing the design matrix into the lmfit() function[4][5]. LIMMA will calculate an analysis of variance (ANOVA) between each paired sample[4][5]. The output of the lmfit() function is then inputted into the eBayes() function which will calculate moderated t-tests for each gene[19]. We can now move on to accounting for multiple testing and then to visualization of our results. See appendix 1.8 for source code.
+
+**Adjust for Multiple Testing**
+
+Since we are doing tens of thousands of tests it is critical that we adjust for multiple testing and control the amount of false discoveries. Storey's q-value method will be used to control the false discovery rate of our differentially expressed genes[17]. To do this, the  qvalue() function is used on the p-values found in the output of the eBayes() function. See appendix 2.0 for source code.
+
+**Gene ID Annotation**
+
+It is important to note that the ouput of the eBayes function has each gene identified by a string of numbers-- these are called probeset IDs and each one corresponds to a particular gene. To make biological sense out of our set of differentially expressed genes, we need to know which genes correspond to each probeset. It is possible to copy and paste individual probeset IDs into the Affymetrix web probeset ID webtool-- but this is very tedious when there are thousands of differentially expressing genes. It is much easier to use the annotate() function to match each probeset ID to its respective gene ID[20]. See appendix 1.9 for source code.
+
+
+# **Results**
+
+**Calculation of $\pi_0$**
+
+The qvalue() function also calculates a $\pi_0$ statistic. $\pi_0$ is the percent of genes which do not differentially express[17]. See appendix 2.0 for code.
+
+In this case:
+
+$\pi_0$ = 0.4532771
+
+This means that about 55 percent of genes are differentially expressed in this set of data.
+
+**Volcano Plot of Differentially Expressed Genes**
+
+Volcano plots are a great way to visualize differentially expressed genes. They plot the probeset IDs by their log-fold-change versus their p-value. Using the highlight function contained within the volcanoplot() function, one can see which genes are most significantly over or under-expressed[16]. See appendix 2.1 for source code. **Figure 9** is the volcano plot generate for this project.
+
+<a href="https://imgbb.com/"><img src="https://image.ibb.co/nNEkfV/Volcanooral.jpg" alt="Volcanooral" border="0"></a>
+
+{**Figure 9** Volcano plot of the top 20 differentially expressed genes found in this experiment.}
+
+**Table of Differentially Expressed Genes with Gene IDs and q-values**
+
+To create a table of differentially expressed genes, functions such as topTable() can be used on the eBayes output[4][5].While topTable() is a convenient function for quickly visualizing results, it is fairly rigid and in some cases a custom data frame can be more effective at portraying results. In this case, a data frame was generated using calculated q-values and annotated probeset IDs. Source code is located in appendix 2.0. **Figure 10** is a table of the most significantly differentially expressed genes sorted by q-value.
+
+<a href="https://imgbb.com/"><img src="https://image.ibb.co/hkOpPq/table.png" alt="table" border="0"></a>
+
+[**Figure 10** Table of the most significantly differentially expressed genes in this experiment. Note the top gene highlighted in red.]
+
+**Write an Excel File**
+
+If you are looking for a particular result that is buried in a vector somewhere in R, it can be helpful to write an excel file of your data. It is easy to search for the results of certain genes of interest in an Excel file. Writetable() is a function that will write an excel file out of an R data[16]. Inside of this Excel file, a user can search for genes using the search function and typing in their gene ID.
+
+# **Discussion**
+
+Recall that in the original study, murine tumors were examined microscopically and with qPCR. Oghumu et al found that the knockout mice had fewer and less severe tumors and that genes *MMP1* and *PTGS2* had higher fold induction in wild-type mice[2]. Due to the limitations of PCR, these are the only genes that were found to be differentially expressed between the two groups of mice. The primers were selected based on prior literature describing associations between these certain genes and *MIF*[2][13]. Their microarray data generated by IPA software also showed differential expression of *MMP1* and *PTGS2* in the human samples as well. This data led them to conclude that deletion of the MIF gene leads lower incidence and severity of oral cancer in humans and mice.
+
+As is apparent in **Figure 10**, this reanalysis was able to generate similar results despite having used a slighlty different approach! Highlighted in red is the gene *MMP1*, which was the most significantly differentially expressed gene in the human tissue. Unfortunately *PTGS2* is not visible in the table of the most differentially expressed genes. However, using the search function in the Excel file generated by the write.table() function, *PTGS2* was found to be significantly differentially expressed as well at rank 1602 with a q-value of .0055. Since the researchers only used PCR on the murine tissue, it was impossible to determine what role *MIF* deletion has in the differential expression of the thousands of other discovered DEgenes. 
+
+**Feedback for Authors**
+
+Since there were no discrepancies with the results of this reanalysis and the claims made by the Oghumu et al in the original study, it follows that the authors properly listed their methods and shared their data. However, there is always room for improvement and some of the authors' methods do not align with the best practices for publishing microarray data as delineated by Ioannidis et al[6]. The minor issues regarding reproducibility in the the reviewed paper are as follows:
+
+1. No specifics about the software used to process the microarray data were disclosed. In the spirit of being as reproducible as possible, an author should ideally list all software used in their study-- including which version. In this case, Oghumu et al only listed that they used "the statistical package R" for their analysis.
+
+2. Oghumu et al did not disclose demographic data of each sample, i.e. smoking status, gender, etc. They collected these metrics and used them to find associations, but there is no way for an outsider to match these details with their respective microarray. Because of this, no additional contrasts besides tumor-normal could be made.
+
+3. Listed statistical methods were vague. Authors did not disclose pertinent details about which statistical methods were used and where in their study. They did mention that they normalized the raw data using RMA, and that they used ANOVA on the PCR results. However, they only stated that IPA was used for differential expression analysis, and since it is not open source software, there is no way for someone who does not own it to know how they arrived at their results.
+
+# **Bibliography**
+
+[1] Overview of DNA microarrays: types, applications, and their future. Curr Protoc Mol Biol. 2013;Chapter 22:Unit 22.1.
+
+[2] Oghumu S, Knobloch TJ, Terrazas C, et al. Deletion of macrophage migration inhibitory factor inhibits murine oral        carcinogenesis: Potential role for chronic pro-inflammatory immune mediators. Int J Cancer. 2016;139(6):1379-90.
+
+[3] Audrey Kauffmann, Robert Gentleman, and Wolfgang Huber. arrayQualityMetrics - a Bioconductor package for quality         assessment of microarray data. Bioinformatics, 25:415-416, 2009.
+
+[4] Matthew E. Ritchie, Belinda Phipson, Di Wu, Yifang Hu, Charity W. Law, Wei Shi, Gordon K. Smyth; limma powers           differential expression analyses for RNA-sequencing and microarray studies, Nucleic Acids Research, Volume          43,Issue     7, 20 April 2015, Pages e47, https://doi.org/10.1093/nar/gkv007
+
+[5] Ritchie, M.E., Phipson, B., Wu, D., Hu, Y., Law, C.W., Shi, W., and Smyth, G.K. (2015). limma powers
+    differential expression analyses for RNA-sequencing and microarray studies. Nucleic Acids Research 43(7),
+    e47.
+
+[6] Ioannidis, J. P., Allison, D. B., Ball, C. A., Coulibaly, I., Cui, X., Culhane, A. C., Noort, V. V. (2008).              Repeatability of published microarray gene expression analyses. Nature Genetics, 41(2), 149-155. doi:10.1038/ng.295
+
+[7] Baker, M. (2016, May 25). 1,500 scientists lift the lid on reproducibility. Retrieved November 11, 2018, from            https://www.nature.com/news/1-500-scientists-lift-the-lid-on-reproducibility-1.19970
+
+[8] Xu, X., Wang, B., Ye, C., Yao, C., Lin, Y., Huang, X., . . . Wang, S. (2008). Overexpression of macrophage migration     inhibitory factor induces angiogenesis in human breast cancer. Cancer Letters, 261(2), 147-157.            
+
+[9] Zhang JM, An J. Cytokines, inflammation, and pain. Int Anesthesiol Clin. 2007;45(2):27-37.
+
+[10] Yu, J., Gu, X., & Yi, S. (2016). Ingenuity Pathway Analysis of Gene Expression Profiles in Distal Nerve Stump      following Nerve Injury: Insights into Wallerian Degeneration. Frontiers in Cellular Neuroscience, 10. doi:10.3389/fncel.2016.00274
+
+[11] Bolstad, B.M., Irizarry R. A., Astrand M., and Speed, T.P. (2003), A Comparison of Normalization Methods for High Density Oligonucleotide Array Data Based on Bias and Variance. Bioinformatics 19(2):185-193
+
+[12] Gautier, L., Cope, L., Bolstad, B. M., and Irizarry, R. A. 2004. affy---analysis of Affymetrix GeneChip
+  data at the probe level. Bioinformatics 20, 3 (Feb. 2004), 307-315.
+
+[13] Watanabe, H., Shimizu, T., Nishihira, J., Abe, R., Nakayama, T., Taniguchi, M., . . . Shimizu, H. (2003). Ultraviolet A-induced Production of Matrix Metalloproteinase-1 Is Mediated by Macrophage Migration Inhibitory Factor (MIF) in Human Dermal Fibroblasts. Journal of Biological Chemistry, 279(3), 1676-1683. doi:10.1074/jbc.m303650200
+
+[14]Bolstad, B.M., Irizarry R. A., Astrand M., and Speed, T.P. (2003), A Comparison of Normalization Methods for High Density Oligonucleotide Array Data Based on Bias and Variance. Bioinformatics 19(2):185-193
+
+[15]"Analyze Your Own Microarray Data in R/Bioconductor." Analyze Your Own Microarray Data in R/Bioconductor - BITS Wiki, wiki.bits.vib.be/index.php/Analyze_your_own_microarray_data_in_R/Bioconductor.
+
+[16] R Core Team (2018). R: A language and environment for statistical computing. R Foundation for
+  Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+  
+[17] John D. Storey with contributions from Andrew J. Bass, Alan Dabney and David Robinson (2015). qvalue:
+  Q-value estimation for false discovery rate control. R package version 2.12.0.
+  http://github.com/jdstorey/qvalue
+  
+[18] Dan Carr, ported by Nicholas Lewin-Koh, Martin Maechler and contains copies of lattice functions written
+  by Deepayan Sarkar (2018). hexbin: Hexagonal Binning Routines. R package version 1.27.2.
+  https://CRAN.R-project.org/package=hexbin
+  
+[19] Phipson, B, Lee, S, Majewski, IJ, Alexander, WS, and Smyth, GK (2016). Robust hyperparameter estimation protects against hypervariable genes and improves power to detect differential expression. Annals of Applied Statistics 10, 946-963. http://projecteuclid.org/euclid.aoas/1469199900
+
+[20] R. Gentleman (2018). annotate: Annotation for microarrays. R package version 1.58.0.

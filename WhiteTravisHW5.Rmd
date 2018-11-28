@@ -1,0 +1,379 @@
+---
+title: "Microarray Differential Expression (33 points)"
+author: "Travis White travis_white@uri.edu"
+date: "10/18/2018"
+---
+
+**Homework Question 1 (5 points)**
+
+
+*a) For expression of a single gene, which sample variance do you think will be more variable: the 8 control samples or the 8 knockout samples?  Why?*
+
+I expect the knockout samples to be more variable as they are paired with RNA from the the 8 control mice; the control mice are paired with their own RNA. We expect at least the APOAI gene to be highly differentially expressed in the knockout samples because it is artificially down-regulated.
+
+*b) Suppose that a gene does not express in the reference sample.  (This is not the source of the zeroes in the data, which are probably due to scanner failures, but it would produce some very low expression values.)  What does this do to the estimate of M for that gene?*
+
+If the gene in the reference sample does not express, the value of M would be higher because the expression value of the reference sample is subtracted from that of the treatment and control expression values. Log2(0) is negative infinity so subtracting a large negative number (which is what we would get with a very small log2(expression value)) would give us a very large M estimate.
+
+
+*c) What are the advantages of using one channel of the microarray for a knock-out mouse and the other for a control mouse?  What is the appropriate test for differential expression if this hybridization design is used?*
+
+The advantage of using one channel for a knockout mouse and the other for a control mouse is that it reduces array bias. Every microarray will have slightly different results which can cause additional noise. These samples are considered paired because they are on the same microarray so we need to use a paired t-test.
+
+*d) Suppose that knocking out the ApoA1 gene turns off expression for this gene and several other genes in the same network.  What is the advantage of using a reference design instead of having one knock-out and one control on each microarray?*
+
+The advantage of using this reference design is that we are creating a sample pool of biological replicates. The control and reference RNA was pooled together and used in both microarrays, so the control and reference expression values should be similar. By doing this, the researchers can reduce cost and improve precision. It should also be possible to evaluate array bias by comparing the expression values between the 2 arrays.
+
+# Differential Expression Analysis of Affymetrix microarrays
+
+```{r, declare libraries}
+require(hexbin)
+require(statmod)
+require(affy)
+require(limma)
+require(qvalue)
+```
+
+
+#Get cel files, change names of samples
+
+```{r, get cel files}
+celPath="C:/Users/Administrator/Desktop/brain"
+brainBatch=ReadAffy(celfile.path=celPath)
+```
+
+
+
+```{r, change names}
+sampleNames(brainBatch)=
+  paste(rep(c("CH","HU"),each=12),rep(c(1:3,1:3),each=4),
+  rep(c("Prefrontal","Caudate","Cerebellum","Broca"),6),sep="")
+sampleNames(brainBatch)
+```
+
+***************
+
+**Homework Question 2: (1 point)**
+
+Draw *hexplom* plots for each brain region.  Do any of the microarrays appear to be different than the others (within region)?
+
+Most of the arrays appear to be linear and similar to one another. HU3 caudate is very spread out and has many extreme values.
+
+```{r, scatterplot matricesb}
+
+brain=exprs(brainBatch)
+hexplom(log2(brain[,c(1,5,9,13,17,21)]))
+hexplom(log2(brain[,c(2,6,10,14,18,22)]))
+hexplom(log2(brain[,c(3,7,11,15,19,23)]))
+hexplom(log2(brain[,c(4,8,12,16,20,24)]))
+```
+
+
+***************
+
+**Homework Question 3:(2 points)**
+
+a) Create a variable *blocks* which has labels for each subject.  This will need to be in the same order as the samples. For example, each of the 4 brain samples for Human subject 1 should be labeled HU1. Print out the values.
+
+```{r 2143124}
+blocks <- paste(rep(c("CH", "HU"),each=12), rep(c(1:3), each=4), sep = "")
+blocks
+```
+
+
+b) Create a variable *trts*
+which has labels for each combination of species and brain region.  For example, each of the 3 human cerebellum samples should be labeled HUCerebellum. Print out the values.
+```{r 1231}
+trts <-  paste(rep(c("CH","HU"),each=12),
+  rep(c("Prefrontal","Caudate","Cerebellum","Broca"),6),sep="")
+trts
+```
+
+
+***************
+ 
+**Homework Question 4:(3 points)**
+
+
+*a) Normalize the expression values and combine into probeset summaries using RMA.*
+
+```{r 12}
+brain.rma <- rma(brainBatch)
+brain.r <- exprs(brain.rma)
+dim(brain.r)
+```
+
+ 
+
+*b) How many probeset summaries are there?  i.e. How many probesets are represented on the array?*
+
+There are 12625 probesets represented on the array.
+
+
+*c) Redo the hexplom plots. (Note that the rma command creates an expressionSet.  You need to use the  exprs command to get the actual expression values.) Are there any obvious problems with the data?*
+
+I do not notice any obvious problems with this data. All of the scatter plots seem to have a mostly linear distribution.
+
+```{r hexplom RMA}
+
+hexplom(log2(brain.r[,c(1,5,9,13,17,21)]))
+hexplom(log2(brain.r[,c(2,6,10,14,18,22)]))
+hexplom(log2(brain.r[,c(3,7,11,15,19,23)]))
+hexplom(log2(brain.r[,c(4,8,12,16,20,24)]))
+```
+
+
+***************
+
+## Compute \(S^2_p\)
+
+
+***************
+
+** Homework Question 5: (2 points)**
+
+*a) Each row of the design matrix represents a treatment.  Print out the design matrix.  How many 1's are in each row?  Why?*
+
+There is a single one in each row. Each one is an intercept that represents a treatment effect and will be used to create a linear model. The one corresponds to the type of tissue that is being tested and its presence is dependent on the position of its tissue sample in the vector.
+
+```{r design}
+design.trt=model.matrix(~0+trts)
+design.trt
+
+```
+
+
+*b) Why does the matrix have 8 columns?*
+
+The matrix has 8 columns because there are four parts of the brain being examined from two groups. We need to have as many columns as there are sources of RNA. Replicates do no get a column.
+
+***************
+
+```{r,eval11}
+corfit = duplicateCorrelation(brain.rma, design.trt, block = blocks)
+
+```
+
+
+***************
+
+**Question 6:(2 points)**
+
+*a) Plot the histogram of intraclass correlations and also print out the consensus correlation. Does the consensus correlation seem reasonable given the histogram?*
+
+Yes, the consensus correlation seems reasonable given the histogram. .45 indicates a moderate correlation--the histogram appears to be properly skewed to represent this.
+
+```{r correlation}
+corfitcor <- tanh(corfit$atanh.correlations)
+corfitcons <- tanh(corfit$consensus.correlation)
+hist(tanh(corfitcor))
+corfitcons
+```
+
+
+***************
+
+## Pooled within treatment variance
+
+
+```{r,evaF}
+fitTrtMean <- lmFit(brain.rma, design.trt, block = blocks, 
+                    cor = corfit$consensus.correlation)
+```
+
+
+***************
+
+**Homework Question 7: (3 points)**
+
+*a) Draw a histogram of the first coefficient.  What is the interpretation of this coefficient in terms of gene expression?* 
+
+It appears that there is no differential expression in the first coefficient; most of the values in this row are similar.
+
+```{r coefficient}
+hist(fitTrtMean$coefficients[1,])
+```
+
+
+*b) Consider the t-test for the hypothesis that the first coefficient is zero and consider \(\pi_0\) the percentage of the tests that are truly null.  What would it mean in terms of gene expression if \(\pi_0=100\%\)?*
+
+If \(\pi_0\) = 100% then that would indicate that there are no significant differentially expressing genes in the first coefficient.
+
+*c) Draw a histogram of the estimated pooled variance \(S_p^2\).  Does it have the characteristic skewed shape?  (Having about 100 bins might help you in visualizing the histogram.)*
+
+Yes, the histogram has the characteristic skewed shape.
+
+```{r hist of var}
+pooled = (fitTrtMean$sigma)^2
+hist(pooled, nclass=100)
+
+```
+
+
+***************
+
+## Create the coefficient matrix for the contrasts
+
+**Homework Question 8:(1 points)**
+
+*a) Below is an example setting up the contrast of the average Chimp versus human effect, and the interaction between species and the two brain regions, cerebellum and Broca region.  I have left out the contrast of Cerebellum versus Broca's region averaged over species.  Set up a command to create the contrast matrix for all 3 of the desired contrasts (i.e. the 2 I already provided plus one more).*  
+
+```{r contmat}
+colnames(design.trt)
+contrast.matrix=makeContrasts(
+  ChVsHu=(trtsCHBroca+trtsCHCaudate+trtsCHCerebellum+trtsCHPrefrontal)/4
+     -(trtsHUBroca+trtsHUCaudate+trtsHUCerebellum+trtsHUPrefrontal)/4,
+  Interact=
+  (trtsCHCerebellum-trtsHUCerebellum)-(trtsCHBroca-trtsHUBroca),
+ levels=design.trt,
+brocavscere=((trtsCHCerebellum + trtsHUCerebellum)/2 - (trtsCHBroca + trtsHUBroca)/2))
+contrast.matrix
+```
+
+
+## Compute the estimated contrasts and compute the moderated t-tests for each contrast.
+
+
+```{r,ev}
+fit.contrast=contrasts.fit(fitTrtMean,contrast.matrix)
+```
+
+
+```{r,e}
+efit.contrast=eBayes(fit.contrast)
+```
+
+
+**Homework Question 9: (10 points)**
+
+*a) The pooled sample standard deviations are stored in component sigma.  Plot the sample variances (x-axis, \(S_p^2\) versus the moderated variances (y-axis, s2.post). Use the abline command to add the line y=x.  What do you notice about the moderated variances?  How many of the moderated variances are larger (smaller) than the sample variances?*
+
+It appears that the moderated variances are slightly smaller than the sample variances. There are 5802 (of 12625) moderated variances that are larger than the corresponding sample variances.
+
+```{r plot var}
+plot((fitTrtMean$sigma^2), efit.contrast$s2.post)
+abline(a=0,b=1)
+sum(efit.contrast$s2.post > fitTrtMean$sigma^2) 
+
+```
+
+
+*b) The moderated variances are associated with larger degrees of freedom.  If the test statistic is some value (e.g. t=1.78) do higher d.f. make it more or less statistically significant?*
+
+Critical values decrease as degrees of freedom increase, so we should expect that this test statistic should be more statistically signifcant if we have more d.f.
+
+
+*c) Obtain a histogram of the estimated value of the contrast coefficient for the contrast between cerebellum and Broca's region.  What is the interpretation of the values in this histogram in terms of differential gene expression?*
+
+The histogram is fairly bell-shaped which would indicate a mixture of genes that are over expressing, under-expressing, and not significantly differently expressing.
+
+```{r histbrc}
+hist(efit.contrast$coefficients[,3], nclass=100)
+
+```
+
+
+*d) For the contrast in part c, which probeset has the largest absolute difference in mean(log(expression))?  What is the estimated fold change for this gene?  Is it up or down regulated in cerebellum compared to Broca's region?* 
+
+The 33925_at probeset has the largest absolute difference in mean. the fold change is 5.028054. It is down-regulated in the cerebellum region.
+
+```{r genenames}
+genelist=geneNames(brainBatch)
+genelist[which.max(abs(efit.contrast[,3]$coefficients))]
+max(abs(efit.contrast[,3]$coefficients))
+```
+
+
+
+*e) Use Google to find the annotation of this probeset.  What is the gene name? (There are better ways to download the annotations for all the probesets.)*
+
+The gene name that corresponds to the probeset NRGN HGNC neurogranin (protein kinase C substrate, RC3).
+
+https://www.affymetrix.com/analysis/netaffx/fullrecord.affx?pk=HG-U95AV2:33925_AT
+
+*f) What is the p-value associated with this probeset for the contrast between cerebellum and Broca's region?*
+
+The p-value associated with this probeset is 9.966758e-23.
+
+
+*g) Draw a histogram of the estimated interaction between species and brain regions cerebellum and Broca region.  What is the largest estimate of this contrast (in absolute value) and which probeset does it belong to?  Interpret the meaning of this difference in terms of fold changes between cerebellum and Broca region in each species.*
+
+The largest estimate is |-3.41| and belongs to the 38285_at probeset. This negative value indicates that the gene expression values of the cerebellum samples were higher than Broca's region. 
+
+
+```{r histinteract}
+genelist[which.max(abs(efit.contrast[,2]$coefficients))]
+hist(efit.contrast$coefficients[,2], nclass=100)
+
+```
+
+
+*h) Draw the histograms of p-values for each of the contrasts, using the contrast names as the main title each histogram.  Do these histograms have the appropriate shape for FDR estimation?*
+
+Yes, these histograms have the appropriate shape for FDR estimation. There is a spike in p-values close to 0 that drops off into a uniform distribution.
+
+
+```{r hists of contrasts}
+hist(efit.contrast[,1]$p.value, main="ChVsHu p-values")
+hist(efit.contrast[,2]$p.value, main="Interact p-values")
+hist(efit.contrast[,3]$p.value, main="brocavscere p-values")
+```
+
+
+
+#Adjust the p-values.
+
+**Homework Question 10: (4 points)**
+
+*a) For each contrast, estimate the q-values. Print the estimated \(\pi_0\) for each contrast and the number of probesets with q <0.05.*
+
+```{r qvals}
+cont1 = efit.contrast[,1]$p.value
+cont2 = efit.contrast[,2]$p.value
+cont3 = efit.contrast[,3]$p.value
+qcont1=qvalue(efit.contrast[,1]$p.value)
+qcont2=qvalue(efit.contrast[,2]$p.value)
+qcont3=qvalue(efit.contrast[,3]$p.value)
+qval1=qcont1$qvalues
+qval2=qcont2$qvalues
+qval3=qcont3$qvalues
+```
+
+The estimate of \(\pi_0\) for contrast one is : `r qcont1$pi0` 
+
+The estimate of \(\pi_0\) for contrast two is : `r qcont2$pi0`
+
+The estimate of \(\pi_0\) for contrast three is : `r qcont3$pi0`
+
+There are `r sum(qval1 < 0.05)` q-values less than 0.05 in contrast one.
+
+There are `r sum(qval2 < 0.05)` q-values less than 0.05 in contrast two.
+
+There are `r sum(qval3 < 0.05)` q-values less than 0.05 in contrast three.
+
+*b) Which contrast appears to have the most differential expression?  Is this what you would expect - why or why not?*
+
+It appears that contrast three has the most differential expression. Yes, the proportion of differential expression should be highest in this sample because we are comparing gene expression averaged over species.
+
+```{r, sessioninfo}
+sessionInfo()
+print(gc())
+```
+
+# References
+
+Benjamini, Y., and Yekutieli, D. (2001). The control of the false discovery rate in multiple testing under dependency. 
+*Annals of Statistics*,**29**: 1165-1188.
+
+Khaitovich, P., Muetzel, B., She, X., Lachmann, M., Hellmann, I., Dietzsch, J., Steigele, S., Do, H. H., Weiss, G., 
+ Enard, W., Heissig, F., Arendt, T., Nieselt-Struwe, K., Eichler, E. E., Paabo, S. (2004)
+Regional patterns of gene expression in human and chimpanzee brains.
+*Genome Research*, **14** (8) :1462--73.
+
+
+Smyth, G. K. (2004). Linear models and empirical Bayes methods for assessing differential expression in microarray experiments. 
+*Statistical Applications in Genetics and Molecular Biology*, **3**, Article 3. http://www.bepress.com/sagmb/vol3/iss1/art3.
+
+
+Storey JD. (2003) The positive false discovery rate: A Bayesian interpretation and the q-value. *Annals of Statistics*, **31**: 2013--2035. 
+

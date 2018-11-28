@@ -1,0 +1,791 @@
+---
+title: "Homework 4 Multiple Testing and FDR (40 points)"
+author: "Travis White travis_white@uri.edu"
+date: "Fall 2018"
+---
+# Declare libraries
+
+```{r load}
+library(qvalue)
+```
+
+# Create function to extract p-values
+
+```{r getP}
+tp=function(x,trt) t.test(x~trt)$p.value
+```
+
+***************
+
+## Homework Question 1  (5 points)
+
+_a) Suppose we have a vector "p" with 1000 values.  What do the following commands compute?  (They each compute something different.)_
+
+# Create a vector with 1000 random values
+```{r}
+p <-c(runif(1000))
+```
+
+
++ i) mean(p)
+```{r}
+mean(p)
+```
+
++ ii) mean(p>0.5)
+```{r}
+mean(p>0.5)
+```
+
+
++ iii) mean(p[p>0.5])
+```{r}
+mean(p[p>0.5])
+```
+
+_b) Write two functions to estimate_ $\pi_0$
+
++ i) pi0PC estimates $\pi_0$ using the Pounds and Cheng method.
+```{r}
+pi0PC=function(x) 2 * mean(x)
+```
+
++ ii) pi0S estimates $\pi_0$ using Storey's method using a cut-off ($\lambda$) at p-value 0.5
+
+```{r}
+pi0s=function(x) pi0est(p, lambda = 0.5)
+```
+
+***************
+
+## Homework Question 2 (4 points)
+
+*a) Suppose that there is no difference in the mean between the treatment and control and that the common value of the mean is $\mu_C=\mu_T=\mu$.  Does the value of $\mu$ matter to the statistical significance of the t-test?  Briefly explain your answer.*
+
+No, if the values of $\mu$ are equal, it does not matter what the value of $\mu$ is because the p-value will always be 1 and t=0. To test this, I generated a few sets of random numbers and ran t-tests on two values with equal means and got the same result each time.
+
+*b) Suppose that there is no difference in the mean between the treatment and control and that the variance of the observations is $\sigma^2_C=\sigma^2_T=\sigma^2$ in both groups.  Does the value of $\sigma^2$ matter to the statistical significance of the test?  Briefly explain your answer.*
+
+No, the values of variance do not affect statistical significance. If we use larger numbers for our means, variance will increase but a t-test will still yield t=0 and p=1 if the means are the same.
+
+*c) Suppose that the true difference in means is $\mu_C-\mu_T=\delta$ and that the variance of the observations is $\sigma^2_C=\sigma^2_T=\sigma^2$ in both groups.  Do the values of $\mu_C,\delta$ and/or $\sigma^2$ matter to the statistical significance of the test?  Briefly explain your answer.*
+
+None of the values matter to the statistical signifcance of the test. Statistical significance is dependent on sample size, not values of mean or variance. A small difference that has no actual effect could be determined significant with a large sample size.
+
+***************
+
+## Simulating from the Null with nSamp=5 for each treatment
+
+# Create data matrices
+
+```{r genData}
+nSamp=5
+nGene=1000
+mu=8
+sig=1
+control=matrix(rnorm(nSamp*nGene,mean=mu,sd=sig),nrow=nGene)
+treated=matrix(rnorm(nSamp*nGene,mean=mu,sd=sig),nrow=nGene)
+sim1Data=cbind(control,treated)
+head(sim1Data)
+```
+
+# Create vector that seperates treatments and controls
+
+```{r treatments2}
+treatments=c(rep("C",nSamp),rep("T",nSamp))
+table(treatments)
+```
+
+# Compute p-values using tp function
+
+```{r computeP}
+p1Sim=apply(sim1Data,1,tp,treatments)
+qvalp1Sim=qvalue(p1Sim)$qvalue
+qvalp1sim1=qvalp1Sim
+```
+
+***************
+
+## Homework Question 3  (8 points)
+
+*a) Draw a histogram of the p-values.  Does the histogram have the expected shape?  Briefly explain your answer.*
+
+Yes, this histogram has the expected shape. It is has a uniform distribution which is what we would expect if there are no differentially expressing genes. If there were differentially expressing genes we would expect a sharp spike of p-values near 0.
+
+```{r}
+hist(p1Sim, main = "Histogram of p-values (p1Sim)")
+```
+
+*b) How many "genes" do you expect to have p<0.05?  How many "genes" actually have p<0.05?  Include your R commands in the Rmd file.*
+
+We expect that 50 genes should have a p-value less than 0.05 (0.05*1000). Using the code chunk below we can see that `r sum(p1Sim < 0.05)` genes have a p-value less than 0.05. In reality, there are 0 genes that are differentially expressed.
+
+# Number of genes with p-value less than 0.05
+```{r}
+sum(p1Sim < 0.05)
+```
+
+*c) What is your estimate of $\pi_0$ using i) the qvalue function ii) your Storey $pi_0$ function from question 1 and iii) the Pounds and Cheng method?* 
+
+_i)_ The estimate of $\pi_0$ using the qvalue function is `r qvalue(p1Sim)$pi0`
+
+_ii)_ The estimate of $\pi_0$ using the storey method is `r pi0s(p1Sim)$pi0`
+
+_iii)_ The estimate of $\pi_0$ using the Pound's and Cheng method is `r pi0PC(p1Sim)`
+
+*d) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method.*
+
+# Number of genes rejected with different multiple testing methods
+
+
+_i)_ No multiple testing adjustment: `r sum(p1Sim < 0.05)`
+
+_ii)_ Bonferroni method: `r sum(p.adjust(p1Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ Storey's method: `r sum(qvalue(p1Sim)$qvalue < 0.05)`
+
+_iv)_ Benjamini and Hochberg: `r sum(p.adjust(p1Sim, method = "BH") < 0.05)`
+
+
+*e) Since we know which genes are null and which are not, we can compute the false discovery proportion (False discoveries/All discoveries).  Compute this proportion for each of the methods in part d)*
+
+
+_i)_ No multiple testing adjustment: `r (sum(p1Sim < 0.05)) / (sum(p1Sim < 0.05))`
+
+_ii)_ Bonferroni method:  `r sum(p.adjust(p1Sim, method = "bonferroni") < 0.05) / sum(p.adjust(p1Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ Storey's method: `r sum(qvalp1sim1[101:1000] < 0.05) / sum(qvalp1sim1 < 0.05)`
+
+_iv)_ Benjamini and Hochberg: `r sum(p.adjust(p1Sim, method = "BH") < 0.05) / sum(p.adjust(p1Sim, method = "BH") < 0.05)`
+
+
+*f) Since we know which genes are null and which are not, we can compute the false nondiscovery proportion (False nondiscoveries/All nondiscoveries).  Compute this proportion for each of the methods in part d)*
+
+
+_i)_ No multiple testing adjustment: `r 0 / (1000 - (sum(p1Sim < 0.05)))`
+
+_ii)_ Bonferroni method: `r 0/1000`
+
+_iii)_ Storey's method: `r 0/ 1000`
+
+_iv)_ Benjamini and Hochberg: `r 0/1000`
+
+
+*g) Generate another sample of the same size and recompute c - f.  Note that in most cases the results differ.  This is why in a simulation study we generate the data hundreds of times to understand the variability of the results.*
+
+
+# Generate a new sample, sim2data, and extract pvlaues into p2sim
+
+```{r}
+nSamp=5
+nGene=1000
+mu=8
+sig=1
+control=matrix(rnorm(nSamp*nGene,mean=mu,sd=sig),nrow=nGene)
+treated=matrix(rnorm(nSamp*nGene,mean=mu,sd=sig),nrow=nGene)
+sim2Data=cbind(control,treated)
+head(sim2Data)
+p2Sim=apply(sim2Data,1,tp,treatments)
+qval1=qvalue(p2Sim)$qvalue
+qval2= sum(qval1 < 0.05)
+```
+*c) What is your estimate of $\pi_0$ using i) the qvalue function ii) your Storey $pi_0$ function from question 1 and iii) the Pounds and Cheng method?* 
+
+_i)_ The estimate of $\pi_0$ using the qvalue function is `r qvalue(p2Sim)$pi0`
+
+_ii)_ The estimate of $\pi_0$ using the storey method is `r pi0s(p2Sim)$pi0`
+
+_iii)_ The estimate of $\pi_0$ using the Pound's and Cheng method is `r pi0PC(p2Sim)`
+
+*d) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method.*
+
+# Number of genes rejected with different multiple testing methods
+
+_i)_ No multiple testing adjustment: `r (sum(p2Sim < 0.05))`
+
+_ii)_ Bonferroni method: `r sum(p.adjust(p2Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ Storey's method: `r sum(qvalue(p2Sim)$qvalue < 0.05)`
+
+_iv)_ Benjamini and Hochberg: `r sum(p.adjust(p2Sim, method = "BH") < 0.05)`
+
+*e) Since we know which genes are null and which are not, we can compute the false discovery proportion (False discoveries/All discoveries).  Compute this proportion for each of the methods in part d)*
+
+_i)_ No multiple testing adjustment:  `r (sum(p2Sim < 0.05)) / sum(p2Sim < 0.05)`
+
+_ii)_ Bonferroni method: `r sum(p.adjust(p2Sim, method = "bonferroni") < 0.05) / sum(p.adjust(p2Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ Storey's method:  `r qval2 / qval2`
+
+_iv)_ Benjamini and Hochberg:`r sum(p.adjust(p2Sim, method = "BH") < 0.05)/ sum(p.adjust(p2Sim, method = "BH") < 0.05)`
+
+*f) Since we know which genes are null and which are not, we can compute the false nondiscovery proportion (False nondiscoveries/All nondiscoveries).  Compute this proportion for each of the methods in part d)*
+
+_i)_ No multiple testing adjustment: `r 0 / (1000 - (sum(p2Sim > 0.05)))`
+
+_ii)_ Bonferroni method: `r 0/1000`
+
+_iii)_ Storey's method: `r 0/1000`
+
+_iv)_ Benjamini and Hochberg: `r 0/1000`
+
+***********
+
+## Homework Question 4 (3 points)
+
+*a) i) What is the true value of $\pi_0$? ii) How many of the 1000 tests do we expect to reject?  iii) How many false discoveries do we expect to make? iiii) How false nondiscoveries do we expect to make?*
+
+_i)_ The true value of $pi_0$ is 0.9.
+
+_ii)_ We expect to reject the null for about 150 of the tests. 100 from the genes that we "upregulated" and 50 from the expected false discoveries at p < 0.05.
+
+_iii_) We expect to make 50 false discoveries
+
+_iv_) Since we have 80% power, we expect to miss 20% of discoveries, so we can expect about ~20 false negatives if we do not make a multiple testing adjustment. 
+
+*b) i) What should our false discovery proportion be if we reject at p<0.05? ii) What should our false nondiscovery proportion if we reject at p<0.05? iii) How many total errors will we make if we reject at p<0.05?*
+
+_i)_ Our false discovery proportion would be ~.33 (50/150) if we reject at p < 0.05.
+
+_ii)_ Our false nondiscovery proportion would be ~0.24 (20/850) if we reject at p < 0.05.
+
+_iii)_ We will make ~70 total errors if we reject at p <0.05.
+
+*c) Suppose that each false discovery costs us \$1 (in wasted follow-up effort) and each false nondiscovery costs us \$5 (in lost opportunity). Which will reduce our total cost more - increasing or decreasing the p-value at which we reject?*
+
+* Since false negatives are more costly, our priority should be to reduce them by increasing statistical power. To do this we need to _increase our p-value_. This will give us a better chance of not missing true discoveries. Decreasing the p-value will result in having less false discoveries and more false nondiscoveries (which are 5X more costly).
+
+**************
+
+## Homework Question 5 (8 points)
+
+# Generate new simulation data
+
+```{r}
+nDiff=100
+delta=2.024438
+DEgenes=matrix(rnorm(nDiff*nSamp,mean=mu+delta,sd=sig),nrow=nDiff)
+treated2=rbind(DEgenes,treated[101:1000,])
+sim5Data=cbind(control,treated2)
+```
+
+
+*a) Redo the t-tests and compute the p-values.  (You can copy this code from the simulation lab.)*
+
+# t-test: treated vs. control/ extract p-values to p5Sim
+
+```{r}
+t.test(control, treated2)
+p5Sim=apply(sim5Data,1,tp,treatments)
+```
+
+
+*b) What should the histogram of p-values look like for the first 100 genes?  What should it look like for the other 900 genes?  Briefly explain your answer.*
+
+*The first 100 genes should have p-values in a spike near zero since they are "upregulated" and have means different from the control mean. The other 900 genes' p-values should be uniformly distributed across values greater than 0.05.
+
+
+*c) Draw the histogram of all the p-values.  Does it have the appropriate shape for using FDR adjustments? Briefly explain your answer.*
+
+Yes, this histogram has the appropriate shape for using FDR adjustments. There is a spike in p-values close to zero and a relatively uniform distribution of p-values greater than 0.05.
+
+```{r}
+hist(p5Sim, nclass=50)
+```
+
+
+*d) What is your estimate of $\pi_0$ using i) the qvalue function ii) your Storey $pi_0$ function from question 1 and iii) the Pounds and Cheng method?*  5
+
+_i)_ The estimate of $pi_0$ using the qvalue function is `r qvalue(p5Sim)$pi0`
+
+_ii)_ The estimate of $pi_0$ using the Storey method is `r pi0s(p5Sim)$pi0`
+
+_iii)_ The estimate of $pi_0$ using the PC method is `r pi0PC(p5Sim)` 
+
+*e) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method* 
+
+# Variables for calculating FDP
+```{r}
+pval1=p5Sim[1:100]
+pvalbon1=p.adjust(p5Sim, method = "bonferroni")
+qval2=qvalue(p5Sim)$qvalue
+qval3=sum(qval2[101:1000] < 0.05)
+pvalBH=p.adjust(p5Sim, method = "BH")
+pvalBH1= sum(pvalBH[101:1000] < 0.05)
+```
+
+
+_i)_ Using no multiple testing adjustment: `r sum(p5Sim < 0.05)` nulls are rejected at p<0.05.
+
+_ii)_ Using the Bonferroni method: `r sum(p.adjust(p5Sim, method = "bonferroni") < 0.05)` nulls are rejected at p<0.05.
+
+_iii)_ Using Storey's method: `r sum(qvalue(p5Sim)$qvalue < 0.05)` nulls are rejected at p<0.05.
+
+_iv)_ Using BH method: `r sum(p.adjust(p5Sim, method = "BH") < 0.05)` nulls are rejected at p<0.05.
+ 
+
+*f) Since we know which genes are null and which are not, we can compute the false discovery proportion.*
+
+_i)_ FDP using no multiple testing adjustment: `r (sum(pval1 > 0.05)) / (sum(p5Sim < 0.05))`
+
+_ii)_ FDP using the Bonferroni method: `r sum(pvalbon1[101:1000] < 0.05) / sum(pvalbon1 < 0.05)`
+
+_iii)_ FDP using Storey's method: `r qval3 / sum(qvalue(p5Sim)$qvalue < 0.05)`
+
+_iv)_ FDP using BH method: `r pvalBH1/ sum(p.adjust(p5Sim, method = "BH") < 0.05)`
+
+
+*g) Since we know which genes are null and which are not, we can compute the false nondiscovery proportion (False nondiscoveries/All nondiscoveries).*
+
+_i)_ FNP using no multiple testing adjustment: `r sum(p5Sim[1:100] > 0.05) / (1000- sum(p5Sim < 0.05))`
+
+_ii)_ FNP using the Bonferroni method: `r sum(pvalbon1[1:100] > 0.05) / (1000 - sum(pvalbon1 < 0.05))`
+
+_iii)_ FNP using Storey's method: `r sum(qval2[1:100] > 0.05) / (1000 - sum(qval2 < 0.05))`
+
+_iv)_ FNP using BH method: `r sum(pvalBH[1:100] > 0.05) / (1000 - sum(pvalBH < 0.05))`
+
+
+*h) Generate another sample of the same size and recompute e - f.*
+
+# Generate another sample
+
+```{r}
+nDiff=100
+delta=2.024438
+DE2genes=matrix(rnorm(nDiff*nSamp,mean=mu+delta,sd=sig),nrow=nDiff)
+treated3=rbind(DE2genes,treated[101:1000,])
+sim6Data=cbind(control,treated3)
+p6Sim=apply(sim6Data,1,tp,treatments)
+pval6sim=p6Sim[1:100]
+pvalbon6sim=p.adjust(p6Sim, method = "bonferroni")
+qval6sim=qvalue(p6Sim)$qvalue
+qval6sim2=sum(qval6sim[101:1000] < 0.05)
+pvalBH6sim1=p.adjust(p6Sim, method = "BH")
+pvalBH6sim2= sum(pvalBH6sim1[101:1000] < 0.05)
+```
+
+*e) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method* 
+
+
+_i)_ Using no multiple testing adjustment: `r sum(p6Sim < 0.05)` nulls are rejected at p<0.05. 
+
+_ii)_ Using the Bonferroni method: `r sum(p.adjust(p6Sim, method = "bonferroni") < 0.05)` nulls are rejected at p<0.05.
+
+_iii)_ Using Storey's method: `r sum(qvalue(p6Sim)$qvalue < 0.05)` nulls are rejected at p<0.05.
+
+_iv)_ Using BH method: `r sum(p.adjust(p6Sim, method = "BH") < 0.05)` nulls are rejected at p<0.05.
+ 
+
+*f) Since we know which genes are null and which are not, we can compute the false discovery proportion.*
+
+
+_i)_ FDP using no multiple testing adjustment: `r (sum(pval6sim > 0.05)) / (sum(p6Sim < 0.05))`
+
+_ii)_ FDP using the Bonferroni method: `r sum(pvalbon6sim[101:1000] < 0.05) / sum(pvalbon6sim < 0.05)`
+
+_iii)_ FDP using Storey's method: `r qval6sim2 / sum(qvalue(p6Sim)$qvalue < 0.05)`
+
+_iv)_ FDP using BH method: `r pvalBH6sim2/ sum(p.adjust(p6Sim, method = "BH") < 0.05)`
+
+
+***********
+
+
+### Simulating with independent genes with nSamp=10 
+
+### Homework Question 6 (8 points)
+
+## Re-do of question 3
+
+# Generating a data set with n=10
+
+```{r}
+nSamp2=10
+nGene2=1000
+control2=matrix(rnorm(nSamp2*nGene2,mean=mu,sd=sig),nrow=nGene2)
+treated10=matrix(rnorm(nSamp2*nGene2,mean=mu,sd=sig),nrow=nGene2)
+sim7Data=cbind(control2,treated10)
+head(sim7Data)
+treatment2=c(rep("C",nSamp2),rep("T",nSamp2))
+table(treatment2)
+p7Sim=apply(sim7Data,1,tp,treatment2)
+```
+
+*a) Draw a histogram of the p-values.  Does the histogram have the expected shape?  Briefly explain your answer.*
+
+Yes, since there are no differentially expressing genes, this histogram has the correct shape. A uniform distribution depicts that there is no significant difference in means. If there was a spike near zero then it would indicate that there are differentially expressing genes.
+
+```{r}
+hist(p7Sim, main = "Histogram of p-values (p7Sim)")
+```
+
+*b) How many "genes" do you expect to have p<0.05?  How many "genes" actually have p<0.05?  Include your R commands in the Rmd file.*
+
+We have 1000 p-values since we have 1000 rows, so we expect to have about 50 false discoveries. No genes are differentially expressed here so ideally there would be 0. 
+
+# Number of genes with p<0.05 in p7Sim
+```{r}
+sum(p7Sim < 0.05)
+```
+
+
+*c) What is your estimate of $\pi_0$ using i) the qvalue function ii) your Storey $pi_0$ function from question 1 and iii) the Pounds and Cheng method?* 
+
+_i)_ The estimate of $\pi_0$ using the qvalue function is `r qvalue(p7Sim)$pi0`
+
+_ii)_ The estimate of $\pi_0$ using the storey method is `r pi0s(p7Sim)$pi0`
+
+_iii)_ The estimate of $\pi_0$ using the Pound's and Cheng method is `r pi0PC(p7Sim)`
+
+*d) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method.*
+```{r}
+# Declaring variables for calculating FDP
+pval7Sim=p7Sim[1:100]
+pvalbon7Sim=p.adjust(p7Sim, method = "bonferroni")
+qval7Sim=qvalue(p7Sim)$qvalue
+qval7Sim2=sum(qval7Sim[101:1000] < 0.05)
+pvalBH7Sim=p.adjust(p7Sim, method = "BH")
+pvalBH7Sim2= sum(pvalBH7Sim[101:1000] < 0.05)
+```
+
+# Number of genes rejected with different multiple testing methods
+
+_i)_ No multiple testing adjustment: `r sum(p7Sim < 0.05)`
+
+_ii)_ Bonferroni method: `r sum(p.adjust(p7Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ Storey's method: `r sum(qvalue(p7Sim)$qvalue < 0.05)`
+
+_iv)_ Benjamini and Hochberg: `r sum(p.adjust(p7Sim, method = "BH") < 0.05)`
+
+*e) Since we know which genes are null and which are not, we can compute the false discovery proportion (False discoveries/All discoveries).  Compute this proportion for each of the methods in part d)*
+
+
+_i)_ FDP using no multiple testing adjustment: `r sum(p7Sim < 0.05)/ sum(p7Sim < 0.05)`
+
+_ii)_ FDP using the Bonferroni method: `r sum(p.adjust(p7Sim, method = "bonferroni") < 0.05) / sum(p.adjust(p7Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ FDP using Storey's method: `r sum(qvalue(p7Sim)$qvalue < 0.05)/ sum(qvalue(p7Sim)$qvalue < 0.05)`
+
+_iv)_ FDP using BH method: `r sum(p.adjust(p7Sim, method = "BH") < 0.05)/ sum(p.adjust(p7Sim, method = "BH") < 0.05)`
+
+
+*f) Since we know which genes are null and which are not, we can compute the false nondiscovery proportion (False nondiscoveries/All nondiscoveries).  Compute this proportion for each of the methods in part d)*
+
+
+_i)_ FNP using no multiple testing adjustment: `r 0 / (1000- sum(p7Sim < 0.05))`
+
+_ii)_ FNP using the Bonferroni method: `r 0 / (1000 - sum(pvalbon7Sim < 0.05))`
+
+_iii)_ FNP using Storey's method: `r 0 / (1000 - sum(qval7Sim < 0.05))`
+
+_iv)_ FNP using BH method: `r 0 / (1000 - sum(pvalBH7Sim < 0.05))`
+
+
+*g) Generate another sample of the same size and recompute c - f.  Note that in most cases the results differ.  This is why in a simulation study we generate the data hundreds of times to understand the variability of the results.*
+
+# Generate a new sample, sim2data, and extract pvlaues into p8sim
+
+```{r}
+nSamp3=10
+nGene3=1000
+control3=matrix(rnorm(nSamp3*nGene3,mean=mu,sd=sig),nrow=nGene3)
+treated4=matrix(rnorm(nSamp3*nGene3,mean=mu,sd=sig),nrow=nGene3)
+sim8Data=cbind(control3,treated4)
+head(sim8Data)
+treatment3=c(rep("C",nSamp3),rep("T",nSamp3))
+table(treatment3)
+p8Sim=apply(sim8Data,1,tp,treatment3)
+```
+*c) What is your estimate of $\pi_0$ using i) the qvalue function ii) your Storey $pi_0$ function from question 1 and iii) the Pounds and Cheng method?* 
+
+
+_i)_ The estimate of $\pi_0$ using the qvalue function is `r qvalue(p8Sim)$pi0`
+
+_ii)_ The estimate of $\pi_0$ using the storey method is `r pi0s(p8Sim)$pi0`
+
+_iii)_ The estimate of $\pi_0$ using the Pound's and Cheng method is `r pi0PC(p8Sim)`
+
+
+*d) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method.*
+
+
+# Number of genes rejected with different multiple testing methods
+
+_i)_ No multiple testing adjustment: `r sum(p8Sim < 0.05)`
+
+_ii)_ Bonferroni method: `r sum(p.adjust(p8Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ Storey's method: `r sum(qvalue(p8Sim)$qvalue < 0.05)`
+
+_iv)_ Benjamini and Hochberg: `r sum(p.adjust(p8Sim, method = "BH") < 0.05)`
+
+
+*e) Since we know which genes are null and which are not, we can compute the false discovery proportion (False discoveries/All discoveries).  Compute this proportion for each of the methods in part d)*
+
+
+_i)_ FDP using no multiple testing adjustment: `r sum(p8Sim < 0.05)/ sum(p8Sim < 0.05)`
+
+_ii)_ FDP using the Bonferroni method: `r sum(p.adjust(p8Sim, method = "bonferroni") < 0.05) / sum(p.adjust(p8Sim, method = "bonferroni") < 0.05)`
+
+_iii)_ FDP using Storey's method: `r sum(qvalue(p8Sim)$qvalue < 0.05)/ sum(qvalue(p8Sim)$qvalue < 0.05)`
+
+_iv)_ FDP using BH method: `r sum(p.adjust(p8Sim, method = "BH") < 0.05)/ sum(p.adjust(p8Sim, method = "BH") < 0.05)`
+
+
+*f) Since we know which genes are null and which are not, we can compute the false nondiscovery proportion (False nondiscoveries/All nondiscoveries).  Compute this proportion for each of the methods in part d)*
+
+
+_i)_ No multiple testing adjustment: `r 0/ (1000 - sum(p8Sim < 0.05))`
+
+_ii)_ Bonferroni method: 0
+
+_iii)_ Storey's method: 0
+
+_iv)_ Benjamini and Hochberg: 0 
+
+
+## Re-do of question 5
+
+# Generate data set with 100 differentially expressed genes and 10 samples
+
+```{r}
+nDiff2=100
+delta=2.024438
+DEgenes4=matrix(rnorm(nDiff2*nSamp3,mean=mu+delta,sd=sig),nrow=nDiff2)
+treatment5=rbind(DEgenes4,treated4[101:1000,])
+treatments2=c(rep("C",nSamp3),rep("T",nSamp3))
+sim9Data=cbind(control3,treatment5)
+p9Sim=apply(sim9Data,1,tp,treatments2)
+pval9Sim=p9Sim[1:100]
+pvalbon9Sim=p.adjust(p9Sim, method = "bonferroni")
+qval9Sim=qvalue(p9Sim)$qvalue
+qval9Sim2=sum(qval9Sim[101:1000] < 0.05)
+pvalBH9Sim=p.adjust(p9Sim, method = "BH")
+pvalBH9Sim2= sum(pvalBH9Sim[101:1000] < 0.05)
+
+```
+
+*a) Redo the t-tests and compute the p-values.
+
+# t-test: treated vs. control/ extract p-values to p9Sim
+
+```{r}
+t.test(sim9Data)
+
+```
+
+
+*b) What should the histogram of p-values look like for the first 100 genes?  What should it look like for the other 900 genes?  Briefly explain your answer.*
+
+*The first 100 genes should have p-values in a spike near zero since they are "upregulated" and have means different from the control mean. The other 900 genes' p-values should be uniformly distributed across values greater than 0.05.
+
+
+*c) Draw the histogram of all the p-values.  Does it have the appropriate shape for using FDR adjustments? Briefly explain your answer.*
+
+Yes, this histogram has the appropriate shape for using FDR adjustments. There is a spike in p-values close to zero and a relatively uniform distribution of p-values greater than 0.05.
+
+```{r}
+hist(p9Sim, nclass=50)
+```
+
+*d) What is your estimate of $\pi_0$ using i) the qvalue function ii) your Storey $pi_0$ function from question 1 and iii) the Pounds and Cheng method?*  5
+
+_i)_ The estimate of $pi_0$ using the qvalue function is `r qvalue(p9Sim)$pi0` .
+
+_ii)_ The estimate of $pi_0$ using the Storey method is `r pi0s(p9Sim)$pi0` .
+
+_iii)_ The estimate of $pi_0$ using the PC method is `r pi0PC(p9Sim)` .
+
+*e) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method* 
+
+_i)_ Using no multiple testing adjustment: `r sum(p9Sim < 0.05)` nulls are rejected at p<0.05. 99 are from the first 100 genes.
+
+_ii)_ Using the Bonferroni method: `r sum(p.adjust(p9Sim[1:100], method = "bonferroni") < 0.05)` nulls are rejected at p<0.05.
+
+_iii)_ Using Storey's method: `r sum(qvalue(p9Sim)$qvalue < 0.05)` nulls are rejected at p<0.05.
+
+_iv)_ Using BH method: `r sum(p.adjust(p9Sim, method = "BH") < 0.05)` nulls are rejected at p<0.05.
+ 
+
+*f) Since we know which genes are null and which are not, we can compute the false discovery proportion.*
+
+_i)_ FDP using no multiple testing adjustment: `r (sum(p9Sim[101:1000] < 0.05)) / (sum(p9Sim < 0.05))`
+
+_ii)_ FDP using the Bonferroni method: `r sum(pvalbon9Sim[101:1000] < 0.05) / sum(pvalbon9Sim < 0.05)`
+
+_iii)_ FDP using Storey's method: `r qval9Sim2 / sum(qval9Sim < 0.05)`
+
+_iv)_ FDP using BH method: `r pvalBH9Sim2/ sum(pvalBH9Sim < 0.05)`
+
+
+*g) Since we know which genes are null and which are not, we can compute the false nondiscovery proportion (False nondiscoveries/All nondiscoveries).*
+
+_i)_ FNP using no multiple testing adjustment: `r sum(p9Sim[1:100] > 0.05) / (1000 - sum(p9Sim < 0.05))`
+
+_ii)_ FNP using the Bonferroni method: `r sum(pvalbon9Sim[1:100] > 0.05) / (1000 - sum(pvalbon9Sim < 0.05))`
+
+_iii)_ FNP using Storey's method: `r sum(qval9Sim[1:100] > 0.05) / (1000 - sum(qval9Sim < 0.05))`
+
+_iv)_ FNP using BH method: `r sum(pvalBH9Sim[1:100] > 0.05) / (1000 - sum(pvalBH9Sim < 0.05))`
+
+*h) Generate another sample of the same size and recompute e - f.*
+
+# Generate another sample
+
+```{r}
+nSamp5=10
+nGene5=1000
+control5=matrix(rnorm(nSamp5*nGene5,mean=mu,sd=sig),nrow=nGene5)
+treated5=matrix(rnorm(nSamp5*nGene5,mean=mu,sd=sig),nrow=nGene5)
+treatment6=c(rep("C",nSamp3),rep("T",nSamp3))
+nDiff=100
+delta=2.024438
+DEgenes5=matrix(rnorm(nDiff*nSamp5,mean=mu+delta,sd=sig),nrow=nDiff)
+treated5=rbind(DEgenes5,treated5[101:1000,])
+sim10Data=cbind(control5,treated5)
+p10Sim=apply(sim10Data,1,tp,treatment6)
+
+# Variables for calculating FPD/FNP
+pval10Sim=p10Sim[1:100]
+pvalbon10Sim=p.adjust(p10Sim, method = "bonferroni")
+qval10Sim=qvalue(p10Sim)$qvalue
+qval10Sim2=sum(qval10Sim[101:1000] < 0.05)
+pvalBH10Sim=p.adjust(p10Sim, method = "BH")
+pvalBH10Sim2= sum(pvalBH10Sim[101:1000] < 0.05)
+```
+
+*e) If you reject the null hypothesis for each gene with p<0.05, how many genes are rejected using i) no multiple testing adjustment ii) the Bonferroni method iii) Storey's method (i.e. q<0.05) and the Benjamini and Hochberg method* 
+
+_i)_ Using no multiple testing adjustment: `r sum(p10Sim < 0.05)` nulls are rejected at p<0.05. 
+
+_ii)_ Using the Bonferroni method: `r sum(p.adjust(p10Sim[1:100], method = "bonferroni") < 0.05)` nulls are rejected at p<0.05. 
+
+_iii)_ Using Storey's method: `r sum(qvalue(p10Sim)$qvalue < 0.05)` nulls are rejected at p<0.05. 
+
+_iv)_ Using BH method: `r sum(p.adjust(p10Sim, method = "BH") < 0.05)` nulls are rejected at p<0.05. 
+ 
+
+*f) Since we know which genes are null and which are not, we can compute the false discovery proportion.*
+
+_i)_ FDP using no multiple testing adjustment: `r (sum(p10Sim[101:1000] < 0.05)) / (sum(p10Sim < 0.05))`
+
+_ii)_ FDP using the Bonferroni method: `r sum(pvalbon10Sim[101:1000] < 0.05) / sum(pvalbon10Sim < 0.05)`
+
+_iii)_ FDP using Storey's method: `r qval10Sim2 / sum(qval10Sim < 0.05)`
+
+_iv)_ FDP using BH method: `r pvalBH10Sim2/ sum(pvalBH10Sim < 0.05)`
+
+***********
+
+# Simulating with strongly cluster-correlated genes with nSamp=5
+```{r correlated}
+nSamp=5
+noiseT=matrix(rnorm(nSamp*nGene,mean=8,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+noiseC=matrix(rnorm(nSamp*nGene,mean=8,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+clustT= matrix(rnorm(nSamp,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T) 
+clustC=matrix(rnorm(nSamp,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+sim11data=cbind((noiseT+clustT),(noiseC+clustC))
+```
+
+**********
+## Homework Question 7 (4 points)
+
+*a) sim1data and sim11data both have the same sample size and no differential expression, while the simulated expression values all have mean=8 and SD=1. However, in sim1data all of the genes are independent, while in sim11data all of the genes are correlated with each other. To check the levels of noise and the means, draw histograms of the means and variances for each gene for the 1000 genes in sim1data and separately for the 1000 genes in sim11data.  Do these histograms look similar?*
+
+Both histograms look similiar in that they resemble the normal distribution. However, the histogram with noise has a different mean and larger spread of values.
+
+# Histogram of means sim1data
+```{r}
+hist(rowMeans(sim1Data),main = "Histogram of Means sim1Data")
+```
+
+# Histogram of means sim11data
+```{r}
+hist(rowMeans(sim11data), main = "Histogram of Means sim11Data (sim7Data)")
+```
+
+# Histogram of variance sim1data
+```{r}
+rowvariance1=apply(sim1Data,1,var)
+hist(rowvariance1, main = "Histogram of Variance sim1Data")
+```
+
+# Histogram of variance sim11data
+```{r}
+rowvariance2=apply(sim11data,1,var)
+hist(rowvariance2, main = "Histogram of Variance sim11Data")
+```
+
+*b) Do the t-tests using sim11data and obtain a histogram of the p-values.  Recall that none of the simulated genes differentially express.  Does the histogram have the expected shape?*  
+
+The histogram of sim11Data (sample with noise) does not have the expected shape. The values are not uniform and there are not many values near 0. In an ideal scenario, the sim11Data histogram should resemble the histogram of sim1Data.
+
+# t-test of sim11data and extracting p-values to p11Sim
+```{r}
+p11Sim=apply(sim11data,1,tp,treatments)
+t.test(sim11data)
+```
+
+# Histogram of p11Sim and p1Sim
+
+```{r}
+hist(p11Sim)
+hist(p1Sim)
+```
+
+*c) Generate random noise 2 more times and repeat part b.  What do you notice?*
+
+There is no pattern to the shape of the histograms and they are not the expected shape.
+
+# Create additional sample with random noise (1)
+```{r}
+nSamp=5
+noiseT1=matrix(rnorm(nSamp*nGene,mean=8,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+noiseC1=matrix(rnorm(nSamp*nGene,mean=8,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+clustT1= matrix(rnorm(nSamp,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T) 
+clustC1=matrix(rnorm(nSamp,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+sim12data=cbind((noiseT1+clustT1),(noiseC1+clustC1))
+```
+
+# Create additional sample with random noise(2)
+```{r}
+nSamp=5
+noiseT2=matrix(rnorm(nSamp*nGene,mean=8,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+noiseC2=matrix(rnorm(nSamp*nGene,mean=8,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+clustT2= matrix(rnorm(nSamp,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T) 
+clustC2=matrix(rnorm(nSamp,sd=sqrt(0.5)),nr=nGene, nc=nSamp,byrow=T)
+sim13data=cbind((noiseT2+clustT2),(noiseC2+clustC2))
+```
+
+# t-test and extracting pvalues to p12sim
+```{r}
+p12Sim=apply(sim12data,1,tp,treatments)
+t.test(sim13data)
+```
+
+# t-test and extracting pvalues to p13sim
+```{r}
+p13Sim=apply(sim13data,1,tp,treatments)
+t.test(sim13data)
+```
+
+# Histogram of p12sim
+```{r}
+hist(p12Sim)
+```
+
+# Histogram of p13sim
+```{r}
+hist(p13Sim)
+```
+
+*d) What do you think could happen when there are some truly differentially expressing genes?*
+
+It would be hard to visualize if there were truly differentially expressed genes in these samples with noise. The histograms shapes vary widely. In these generated scenarios, there could be a greater number of false positives than expected.
+
+***********
+```{r sessionInfo}
+sessionInfo()
+```

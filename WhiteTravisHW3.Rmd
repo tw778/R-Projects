@@ -1,0 +1,154 @@
+---
+title: "Homework 3 - Exploratory Data Analysis (25 points)"
+author: "Travis White, travis_white@uri.edu"
+date: "Fall, 2018"
+---
+## Load necessary libraries
+
+```{r libraries}
+library(colonCA)
+library(hexbin)
+```
+
+****************
+## Homework Question 1 (3 points)  
+
+1. About how many significant tests do you expect due to random chance if you declare statistical significance for p<0.05?
+
++   **If we declare a statistical significance of p<0.05, there is a 5% chance that a value is significant by random chance. So in this case there will be 100 false-discoveries. (2000 * 0.05)**
+
+2. Suppose you drew a histogram of all 2000 p-values.  What would it look like? Justify your answer.  Reference an appropriate reading from the articles on basic statistics from the Week 2 or Week 3 readings.
+
++   **If there is no biologically based differential expression between the healthy and diseased tissue, all of our p-values will be greater than 0.05 and we have to accept a null hypothesis that predicts no difference in expression. So our histogram would be flat and have no peaks near 0. There could be some values less than 0.05 due to random chance or technical issues but most bins will be of similiar height and distributed across the x-axis.**
+
+*****************
+## Homework Question 2 (5 points)
+
+1. What are some appropriate statistical tests to determine if a gene differentially expresses in different tissue types?
+
++   **One could use a permutation test or a t-test to determine if a gene differentially expresses in different tissue types.** 
+
+2. What assumptions are required for these tests to be valid?
+
++   **The permutation test is a nonparametric test, so by definition it does not make any assumptions about the shape of the distribution. In the given colon cancer case, the permutation test cannot be used because there is a mixture of paired and unpaired samples.**
+
++   **The t-test is a parametric test, so by definition it can be used when the given distribution is assumed to resemble a uniform distribution. The t-test can be used to measure differential gene expression in this case.**
+
+3. What is the advantage of using healthy and diseased tissue from the same patients?  Reference an appropriate reading from the articles on basic statistics from the Week 2 or Week 3 readings.
+
++   **The advantage of using healthy and diseased tissue from the same patients is that there is less variation between two types of tissue from the same patient. These types of dependent samples are favorable for producing positive correlations.**
+
+*********************
+# Load data and create variables
+```{r}
+data(colonCA)
+colonExprs=exprs(colonCA)
+colonPheno=pData(colonCA)
+```
+
+## Homework Question 3 (3 points)
+
+a) Draw boxplots of all the expression values in the first 6 microarrays on one figure.  Use logarithm base 2 log2(x) to make the data more symmetric.
+
++   **Figure is listed below.**
+
+
+b) Using the help window, read the R documentation on boxplots.  What is the default definition of the whiskers and of outliers on the boxplots?
+
++   **To edit the whiskers, one should use the "range" command. The default setting will send a whisker out to the positive values that are no greater than IQR time range. In the default S3 method, range is set to 1.5.**
+
+
+****************
+
+```{r boxplot}
+boxplot(log2(colonExprs[,1:6]), main="The First 6 Columns of Microarray Gene Expression Data", xlab="Microarray 1-6", ylab="log2(colonExprs)")
+```
+
+
+****************
+## Homework Question 4 (4 points)
+
+a) Draw a scatterplot of log2 expression for gene 15 versus gene 16 with appropriate labels for the x and y axes and a main title. (Check the help for the *plot* command for details.)
+
++   **See figure below**
+
+b) Use the *points* command to redraw the tumor expression values in red on your plot using a logical operator to select the correct data for both genes.
+
++   **See figure below (I used red T's instead of coloring the dots)**
+
+***************
+```{r pairs}
+z <- c(colonPheno[,3] == "t")
+x <- c(colonExprs[15,])
+y <- c(colonExprs[16,])
+
+plot(log2(x),log2(y),main="Gene 15 vs. Gene 16", xlab= "Gene 15-log2(gene expression data)", ylab = "Gene 16-log2(gene expression data)",cex=1, col="black", pch= 19, font.main=3, cex.main=2, col.main="dark green", points(log2(x[z]), log2(y[z]), col="red", pch="T"))
+
+```
+
+****************
+
+## Homework Question 5 (2 points)
+
+a) What do you notice in the plots that indicates dependence among
+the samples?  What numerical summary can be used to summarize the dependence?
++   **We could use correlation to summarize the dependence in this example. It appears that tumor and normal tissue samples are more correlated with each other than with other samples; the points are more tightly centered around a linear line. This is likely due to biological dependence-- two tissue samples from the same patient will have similar gene expression values.**
+
+************
+## Homework Question 6 (2 points)
+
+
+a) Use  *hexbin* to plot all the values on the first 2 microarrays on the log2 scale.
+
++   **See Figures below**
+
+b) Then use *hexplom* to plot all the values on the first 6 microarrays. 
+
++   **See Figures Below**
+
+
+```{r}
+plot(hexbin((log2(colonExprs[,1])), (log2(colonExprs[,2])), xbins = 30),main = "Density Plot of Microarrays 1+2")
+plot(hexplom(log2(colonExprs[,1:6])))
+
+```
+
+***********
+
+## Homework Question 7 (3 points)
+
+a) Compute the minimum, maximum, mean, median, SD and IQR for gene 15.
+min(colonExprs[,15])
+```{r}
+min(colonExprs[15,])
+max(colonExprs[15,])
+mean(colonExprs[15,])
+sd(colonExprs[15,])
+IQR(colonExprs[15,])
+```
+
+*****************
+# Homework Question 8 (2 points)
+
+a) Compute the correlations of the log2 expression values on the first 6 microarrays. (The output should be a $6\times 6$ matrix.)
+
+```{r}
+cor((log2(colonExprs[,1:6])))
+```
+
+********************
+# Homework Question 9 (1 point)
+
+a) Compute a table from *colonPheno\$class* giving the number of samples of each type of tissue.
+```{r}
+table(colonPheno$class)
+```
+
+*****************
+
+## Information about the session 
+
+```{r sessionInfo}
+sessionInfo()
+```
+
