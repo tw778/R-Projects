@@ -1,0 +1,333 @@
+---
+title: "Comparing RNA-seq and Microarray Differential Expression - Part 1 (26 points)"
+author: "Travis White"
+date: "October 30, 2018"
+output: html_document
+---
+
+# Load software
+
+```{r libraries, message=FALSE}
+library(hexbin)
+library(edgeR)
+library(qvalue)
+library(limma)
+```
+
+
+## RNA-seq Data
+
+# Create the RNA-seq count matrix.
+
+```{r readData}
+wdir=getwd()
+setwd("C:/Users/Administrator/Desktop/RatAnalysis/RatRNASeq")
+files=dir(pattern="bowtie")
+files
+readRats=read.table(files[1],header=T)
+names(readRats)=c("gi",paste(substr(files[1],11,12),1,sep=""))
+
+for (i in 2:length(files)) {
+tab=read.table(files[i],header=TRUE)
+names(tab)=c("gi",paste(substr(files[i],11,12),i,sep=""))
+readRats=merge(readRats,tab,by="gi",all=T)
+}
+dim(readRats)
+head(readRats)
+setwd(wdir)
+```
+
+
+
+# Homework Question 1: (1 point) 
+
+**a) Insert your command for this replacement into the .Rmd file.**
+
+```{r Replace NA}
+
+readRats[is.na(readRats)] <- 0
+
+```
+
+
+```{r fixMatrix}
+rownames(readRats)=readRats[,1]
+readRats=readRats[,2:9]
+head(readRats)
+```
+
+
+## Homework Question 2 (6 points)
+
+
+**a) Draw a histogram of log2(counts) for each sample.  (Remember to add 1/4 or 1/2 so there are no zeroes).  Are there any notable problems with the samples?**
+
+There are no obvious problems with this data. There are numerous zero counts which must be removed.
+
+```{r HistsofEach}
+
+par(mfrow=c(2,4))
+for (i in 1:8) hist(log2(readRats +0.25)[,i],main=colnames(log2(readRats + 0.25))[i])
+
+```
+
+
+**b) Use hexplom to draw scatterplots of the log2(counts).  Are there any notable problems?**
+
+A2 does not appear to have Poisson distribution when compared to its biological replicates. Everything else is as we would expect-- Poisson distribution between like specimens and Extra- Poisson where the two groups are compared.
+
+```{r hexplot}
+
+hexplom(log2(readRats+.25))
+
+```
+
+
+**c) Compute the total library size for each of the 8 libraries.  Are there any unusually large or small libraries?**
+
+AA1 and CT5 are unusually small libraries; they are nearly half the size of the mean of their respective groups.
+
+```{r libsize}
+
+colSums(readRats)
+mean(colSums(readRats[1:4]))
+mean(colSums(readRats[5:8]))
+
+```
+
+
+**d) I always sum up the reads for each feature and look at features with lots of reads.  Are there any features taking up more than 3% of the read space.**
+
+No, there are no features taking up more than 3% of the read space.
+
+```{r percreadspace}
+
+maxp=function(v) max(v)/sum(v)
+apply(readRats,2,maxp)
+
+```
+
+
+
+**e) As well, I discard features with fewer than 10 reads in all the samples as there is no power to detect differential expression analysis for features with very low total counts.  Create a new count matrix with genes with at least 10 reads per feature and call it bigRats to match my commands that follow.  How many genes are left in the data?**
+
+After removing genes with less than 10 total reads, there are 22613 genes remaining in the data.
+
+```{r bigrats}
+
+geneTotal=rowSums(readRats)
+bigRats=readRats[geneTotal>10,]
+dim(bigRats)
+
+```
+
+
+```{r clusterSamples}
+par(mfrow=c(1,1))
+lBig=log2(bigRats+0.5)
+dist=as.dist(1-cor(lBig))
+plot(hclust(dist))
+```
+
+
+# Homework Question 3: (2 points)
+
+
+**What is your biological interpretation of the cluster dendrogram of samples?**
+
+The dendrogram illustrates that the two groups of mice tissue differ from one another in terms of gene expression. It would appear that the administration of aristocholic acid alters gene expression in the renal tissue of mice.
+
+
+# RNA-seq Normalization
+
+
+```{r edger}
+require(edgeR)
+treatments=as.factor(substr(colnames(bigRats),1,2))
+treatments
+d=DGEList(counts=bigRats, group=treatments,genes=rownames(bigRats))
+d=calcNormFactors(d,method="TMM")
+```
+
+```{r design}
+design <- model.matrix(~0+treatments)
+colnames(design) <- levels(treatments)
+head(design)
+```
+
+```{r dispersion}
+d=estimateDisp(d,design,robust=TRUE)
+plotBCV(d)
+```
+
+
+# Homework Question 4: (3 points)
+
+**a) What is the common dispersion for these data? Briefly, Why might you expect the dispersion to be smaller among laboratory rats than among primates?  (Consider both genetic and environmental factors.)**
+
+The common dispersion for the rats is 0.07754657. We should expect dispersion to be smaller among laboratory rats because they are biological replicates of the same species. If we took biopsies of the same mouse kidney and sequenced them, we would expect only Poisson variability, and we would expect a dispersion value very close to 0. Since the tissue samples are from different mice of the same species, we have extra-Poisson variability. In the primate study, they are comparing tissue from humans and two different species of primates, so there is Poisson variability, systematic variability, and biological variability-- all of this results in a greater dispersion value.
+
+**b) Suppose that a gene has mean expression 100.  What is the variance of expression if the expression distribution is Poisson?  What is it if the expression distribution has dispersion 0.16?  What about 0.07?**
+
+If we have a gene with mean expression 100, then the variance of expression will also be 100 because $\sigma^2$ = $\mu$ under the Poisson model.
+
+
+With dispersion 0.16: $\sigma^2$ = 100(1 + 100*0.16) = 1700
+
+With dispersion 0.07: $\sigma^2$ = 100(1 + 100*0.07) = 800
+
+
+# Differential Expression Analysis - **edgeR**
+
+# Homework Question 5: (6 points)
+
+**a)  Do the differential expression analysis and draw the histogram of p-values.  Is the shape of the histogram reasonable for multiple testing adjustment?**
+
+Yes, this histogram looks great for multiple testing adjustment: there is a sharp peak close to zero that drops off into a uniform distribution.
+
+```{r DEandhist}
+exact.AAvCT=exactTest(d,pair=c("AA","CT"))
+exact.AAvCT.p=exact.AAvCT$table$PValue
+hist(exact.AAvCT.p,main="Male vs Female Human",xlab="p-values",nclass=50)
+
+```
+
+
+**b)  What is the estimated value of $\pi_0$ the percentage of genes that do not differentially express?**  
+
+The estimated value of $\pi_0$ is 0.59201.
+
+```{r pi0}
+qval1=exact.AAvCT$table$PValue
+qval2=qvalue(qval1)
+
+```
+
+
+
+**c) Use the *qvalue* function in the *qvalue* library to compute the q-values.  Save the qvalues in a vector named *edgeRq*.  How many genes have $q\le 0.05$?  Save the list of gene ids of the significant genes in a vector named *edgeRid* (and include the command for this in the R Markdown file.)**
+
+There are 9857 genes that have a q-value that is less than or equal to 0.05.
+
+```{r qvalues}
+
+edgeRq=qval2$qvalues
+sum(edgeRq <= 0.05)
+geneids1=edgeRq <= 0.05
+edgeRid=bigRats[geneids1,]
+dim(edgeRid)
+```
+
+
+**d) Print out a table with the 10 genes with the smallest q-values, their raw expression values and the estimated fold-change.**
+
+
+```{r}
+geneids <- c(exact.AAvCT$genes[,1])
+qval <- c(edgeRq)
+logfc <- c(exact.AAvCT$table$logFC)
+rawcounts <- c(rowSums(bigRats))
+df <- data.frame(geneids,qval,logfc,rawcounts)
+lowestten <- df[order(qval),]
+lowestten[1:10,]
+
+```
+
+
+# RNA-seq analysis using **voom**
+
+# Homework Question 6: (0 points)
+
+
+```{r voom}
+require(limma)
+v=voom(d,design,plot=TRUE)
+```
+
+
+# Homework Question 7: (6 points)
+
+**a) Using "v" do the differential expression analysis and draw the histogram of p-values.  Is the shape of the histogram reasonable for multiple testing adjustment?**
+
+```{r dexvoom}
+
+fit=lmFit(v,design)
+contrast.matrix=makeContrasts(AAvsCT=AA-CT,levels=design)
+fit.contrast=contrasts.fit(fit,contrast.matrix)
+efit.contrast=eBayes(fit.contrast)
+voom.AAvCT.p=efit.contrast$p.value
+hist(voom.AAvCT.p,main="Aristocholic Acid Treated vs Control",xlab="p-values",nclass=50)
+
+
+```
+
+
+
+**b) What is the estimated value of $\pi_0$ the percentage of genes that do not differentially express?**
+
+The estimate value of $\pi_0$ is .3079184.
+
+```{r qvls}
+
+qvalvoom=efit.contrast$p.value
+qvalvoom1=qvalue(qvalvoom)
+
+
+```
+
+
+
+**c) Compute the q-values and save the output in a file called voomq.  How many genes have $q\le 0.05$?  Save the list of gene ids of the significant genes in a vector named "voomid" (and include the command for this in the RMD file.)**
+
+There are 13073 genes that have a q-value that is less than or equal to 0.05 using the voom method.
+
+```{r qvlsle}
+
+voomq=qvalvoom1$qvalues
+sum(voomq <= 0.05)
+geneids2=voomq <= 0.05
+voomid=bigRats[geneids2,]
+dim(voomid)
+
+```
+
+
+
+**d) Print out a table with the 10 genes with the smallest q-values, their raw expression values and the estimated fold-change.**
+
+```{r qfctab}
+
+geneidsv <- c(v$genes[,1])
+qvalv <- c(voomq)
+logfcv <- c(efit.contrast$coefficients)
+rawcountsv <- c(rowSums(bigRats))
+dfv <- data.frame(geneidsv,qvalv,logfcv,rawcountsv)
+lowesttenv <- dfv[order(qval),]
+lowesttenv[1:10,]
+
+```
+
+
+
+
+# Homework Questions 8: (2 points)
+
+**Draw a Venn Diagram (using R) showing the number of genes with $q-value \le 0.05$ for  edgeR and voom.  Does it look like one method is more powerful?  Support your answer.**
+
+It appears that Voom is much more powerful than the edgeR method as it detected 3363 more differentially expressed genes.
+
+```{r venn}
+
+vennDiagram(vennCounts(cbind(geneids1,geneids2),include="both"),
+            names=c("EdgeR", "Voom"))
+
+```
+
+# SessionInfo
+
+```{r sessionInfo}
+toLatex(sessionInfo())
+print(gc())
+```
+ 
+

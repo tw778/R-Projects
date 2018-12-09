@@ -1,0 +1,388 @@
+---
+title: "Homework 7: Comparing RNA-seq and Microarray Differential Expression (25 points)"
+author: "Travis White"
+date: "November 2018"
+output: html_document
+---
+
+# Preliminaries
+
+```{r libraries, message=FALSE}
+library(hexbin)
+library(edgeR)
+library(qvalue)
+library(limma)
+library(affy)
+library(rat2302.db)
+library(gdata)
+```
+
+# Load .Rdata from HW6
+
+```{r RNASeqFiles}
+load("C:/Users/Administrator/Desktop/RatAnalysis/.Rdata")
+```
+
+#Microarray Data
+
+```{r ReadAffy,results='hide', message=FALSE, echo=FALSE}
+celfileDir="C:/Users/Administrator/Desktop/RatAnalysis/LabKCelFiles/LabKCelFiles"
+CELdata=ReadAffy(celfile.path=celfileDir)
+rat.rma=rma(CELdata)
+```
+
+```{r rerunvoom,message=FALSE,echo=FALSE,results='HIDE'}
+
+# For some reason, the voom p-values won't load from HW6, so here is the code to get them in this HW
+
+wdir=getwd()
+setwd("C:/Users/Administrator/Desktop/RatAnalysis/RatRNASeq")
+files=dir(pattern="bowtie")
+files
+readRats=read.table(files[1],header=T)
+names(readRats)=c("gi",paste(substr(files[1],11,12),1,sep=""))
+design <- model.matrix(~0+treatments)
+colnames(design) <- levels(treatments)
+
+treatments=as.factor(substr(colnames(bigRats),1,2))
+treatments
+d=DGEList(counts=bigRats, group=treatments,genes=rownames(bigRats))
+d=calcNormFactors(d,method="TMM")
+
+for (i in 2:length(files)) {
+tab=read.table(files[i],header=TRUE)
+names(tab)=c("gi",paste(substr(files[i],11,12),i,sep=""))
+readRats=merge(readRats,tab,by="gi",all=T)
+}
+setwd(wdir)
+treatments=as.factor(substr(colnames(bigRats),1,2))
+d=DGEList(counts=bigRats, group=treatments,genes=rownames(bigRats))
+d=calcNormFactors(d,method="TMM")
+d=estimateDisp(d,design,robust=TRUE)
+v=voom(d,design,plot=FALSE)
+fit=lmFit(v,design)
+contrast.matrix=makeContrasts(AAvsCT=AA-CT,levels=design)
+fit.contrast=contrasts.fit(fit,contrast.matrix)
+efit.contrast=eBayes(fit.contrast)
+voom.AAvCT.p=efit.contrast$p.value
+
+
+```
+
+***************
+
+# Homework Question 1:( 2 points)
+
+*What is the name (cdf) of the microarrays and how many probesets does in have?  (Hint: just type the dataset name and the basic information is printed.)*
+
+cdf=Rat230_2 (31099 affyids)
+
+***************
+
+# Homework Question 2: (8 points)
+
+*a)  Do the differential expression analysis and draw the histogram of p-values.  Is the shape of the histogram reasonable for multiple testing adjustment?*
+
+The shape of this histogram looks great for multiple testing: there is a sharp peak of values near zero that quickly drops off into a uniform distribution.
+
+```{r DEX}
+pho=rat.rma@phenoData
+pho@data[ ,2] = c("Acid","Acid","Acid","Acid","Control","Control","Control", "Control")
+colnames(pho@data)[2]="source"
+groups = pho@data$source
+fo = factor(groups,levels=c("Acid","Control"))
+designmat = model.matrix(~ 0 + fo)
+colnames(design) = c("Acid","Control")
+rat.fit = lmFit(rat.rma,design)
+rat.contrast.matrix = makeContrasts(Acid-Control,levels=design)
+rat.fit.con = contrasts.fit(rat.fit,rat.contrast.matrix)
+rat.data.fit.eb = eBayes(rat.fit.con)
+p.valsaffy=rat.data.fit.eb$p.value
+hist(p.valsaffy)
+
+```
+
+
+
+b) *What is the estimated value of $\pi_0$ the percentage of genes that do not differentially express?*
+
+The value of $\pi_0$ is 0.2700774.
+
+```{r qvals}
+
+qvals1affy=qvalue(p.valsaffy)
+qvals2affy=qvals1affy$qvalues
+qvals1affy$pi0
+
+```
+
+
+c) *Compute the q-values.  How many genes have $q\le 0.05$?  Save the list of gene ids of the significant genes in a vector named ``AffySig" (and include the command for this in the Rmd file.)*
+
+There are 18434 genes with a q-value less than or equal to 0.05.
+
+```{r affysig}
+
+sum(qvals2affy <= 0.05)
+AffySig1 <- c(qvals2affy <= 0.05)
+AffySig2= readRats[AffySig1,]
+AffySig= rownames(AffySig2)
+```
+
+
+*d) Print out a table with the 10 genes with the smallest q-values, their raw expression values and the estimated fold-change.*
+
+```{r table}
+ratexprs=exprs(rat.rma)
+qvaltab <- c(qvals2affy)
+logfc <- c(rat.data.fit.eb$coefficients)
+rawexprvalues <- c(rowSums(ratexprs))
+mostsigtab <- data.frame(qvals2affy,qvaltab,logfc,rawexprvalues)
+mostsigtab1 <- mostsigtab[order(qvals2affy),]
+head(mostsigtab1,10)
+
+```
+
+***************
+
+#Matching RNA-seq and Affymetrix microarray
+
+```{r getProbesets}
+AffyIds=featureNames(rat.rma)
+```
+
+
+```{r readIDtab}
+wdir=getwd()
+setwd("C:/Users/Administrator/Desktop/RatAnalysis/LabKCelFiles/LabKCelFiles")
+IDRefSeq=read.delim("Gi2RefSeqID.txt",header=T)
+head(IDRefSeq)
+setwd(wdir)
+```
+
+
+```{r ratdb}
+library(rat2302.db)
+ls("package:rat2302.db")
+```
+
+
+```{r select}
+AffyRefSeq <- select(rat2302.db, AffyIds, "REFSEQ") 
+head(AffyRefSeq)
+
+```
+
+
+```{r matchIds, message=FALSE,echo=FALSE,results='HIDE'}
+NM=substr(AffyRefSeq[,2],1,2)=="NM"
+AffyRefSeq=AffyRefSeq[NM,]
+Affydup=!(duplicated(AffyRefSeq[,1])|duplicated(AffyRefSeq[,1],fromLast=T))
+AffyUniq=AffyRefSeq[Affydup,]
+dim(AffyUniq)
+AffyRefdup=!(duplicated(AffyUniq[,2])|duplicated(AffyUniq[,2],fromLast=T))
+AffyUniq=AffyUniq[AffyRefdup,]
+dim(AffyUniq)
+sum(duplicated(AffyUniq$REFSEQ))
+sum(duplicated(AffyUniq$PROBEID))
+sum(duplicated(IDRefSeq[,2]))
+```
+
+
+```{r makeIDtables, message=FALSE,results='HIDE',echo=FALSE}
+m=match(IDRefSeq[,2],AffyUniq[,2])
+
+AllId=cbind(IDRefSeq[,1:2],AffyUniq[m,])
+head(AllId)
+AllId=AllId[!is.na(AllId$REFSEQ),]
+dim(AllId)
+```
+
+***************
+
+# Homework Question 3: (15 points)
+
+*a) Create a matrix called AllExprs containing the matched RMA-normalized microarray data and the log2(count+1/4) RNA-seq data.  Note that since we computed p-values only for the RNA-seq features with 10 or more reads, this step will further reduce the number of features we are matching.  Do this by by matching the RMA-normalized data to AllId  using the PROBEID column and using the gi names of your filtered RNA-seq data.  (Remember that the probeset and GI names are the row names of the expression matrix.) It is not clear that this filtering is optimal, since genes that were not detected in the RNA-seq study, might be detected on the microarray.  For assessing matching between the two platforms, this is conservative.*
+
+```{r allexprsmatrix}
+readRatsgis=readRats[,1]
+readratslogs=log2(readRats[,2:8]+0.25)
+rrdf=data.frame(readRatsgis,readratslogs)
+affymatch= match(rownames(ratexprs), AllId$PROBEID)
+rnamatch= match(rrdf[,1], AllId$GI)
+matchedaffy= ratexprs[affymatch,]
+matchedrna= rrdf[rnamatch,]
+mataffy= as.matrix(matchedaffy)
+matrna= as.matrix(matchedrna)
+
+# cbindX is part of the gdata package
+AllExprs= cbindX(mataffy,matrna)
+head(AllExprs)
+
+```
+
+
+*b) Remove any rows of the matrix that have missing data.*
+
+```{r remove}
+
+AllExprsnona=na.omit(AllExprs)
+sum(is.na(AllExprsnona))
+
+```
+
+
+*b) Create a matrix called **AllP** by matching the p-values from the differential expression output in the same way.  Include the output from **edgeR** and **voom** for the RNA-seq data and limma for the microarray data.*
+
+```{r allpmat}
+
+pvalsedger=exact.AAvCT.p
+genesedger=exact.AAvCT$genes
+edgerdf=data.frame(pvalsedger,genesedger)
+edgermat=as.matrix(edgerdf)
+matchedger=match(rownames(edgermat),AllId$GI)
+matchedpvalsedger=edgermat[matchedger]
+matchededgergenes=AllId$GI[matchedger]
+dfedgercom=data.frame(matchededgergenes,matchedpvalsedger)
+finalmatrixedger=as.matrix(dfedgercom)
+
+pvalsvoom = voom.AAvCT.p
+voomdf=data.frame(pvalsvoom)
+voommat=as.matrix(voomdf)
+matchedvoom=match(rownames(voommat),AllId$GI)
+matchedpvalsvoom=voommat[matchedvoom]
+matchedvoomgenes=AllId$GI[matchedvoom]
+dfvoom=data.frame(matchedvoomgenes,matchedpvalsvoom)
+finalmatrixvoom=as.matrix(dfvoom)
+
+affygenes= rownames(rat.data.fit.eb$coefficients)
+affyps=rat.data.fit.eb$p.value
+affydf=data.frame(affyps,affygenes)
+affymat=as.matrix(affydf)
+matchedaffy=match(rownames(affymat),AllId$PROBEID)
+matchedpvalsaffy=as.numeric(affymat[matchedaffy])
+affyprobeids=AllId$PROBEID[matchedaffy]
+dfaffy=data.frame(affyprobeids,matchedpvalsaffy)
+finalmatrixaffy=as.matrix(dfaffy)
+
+
+AllP=cbindX(edgerdf,voomdf,dfaffy)
+AllPnona=na.omit(AllP)
+head(AllPnona)
+```
+
+
+*Do a **hexplom** plot of the 3 sets of log10(p-values) and also compute the correlation of the p-values.  Are they strongly correlated?*
+
+Voom and EdgeR have a correlation coefficient of .87 which indicates they are very similar. The correlation coefficients between the microarray output and the RNA-seq outputs are close to zero which indicates little to no similarity.
+
+```{r scatterplotmatrix}
+edgerhex <- c(AllPnona[,1])
+voomhex <- c(AllPnona[,3])
+affyhex <- c(AllPnona[,5])
+
+logedgerhex <- c(log10(edgerhex))
+logvoomhex <- c(log10(voomhex))
+logaffyhex <- c(log10(affyhex))
+
+
+
+hexdf= data.frame(logedgerhex,logvoomhex,logaffyhex)
+cor(hexdf)
+hexplom(hexdf)
+```
+
+
+*d) Create a Venn diagram of the genes with $p\le 0.05$ for the 3 analyses.  How well do they match up?*
+
+```{r vennone}
+
+edgerle= edgerhex <= 0.05
+voomle= voomhex <= 0.05
+affyle= affyhex <= 0.05
+
+vennDiagram(vennCounts(cbind(edgerle,voomle, affyle),include="both"),
+            names=c("EdgeR", "Voom", "Affy"))
+
+```
+
+
+
+
+*e) Create a Venn diagram of the genes with $q \le 0.05$ for the 3 analyses.  How well do they match up?*
+
+```{r vennq}
+
+edgerhexq=qvalue(edgerhex) 
+voomhexq=qvalue(voomhex) 
+affyhexq=qvalue(affyhex) 
+
+edgerhexq1=edgerhexq$qvalue 
+voomhexq1=edgerhexq$qvalue 
+affyhexq1=affyhexq$qvalue
+
+edgerhexqle= edgerhexq1 <= 0.05
+voomhexqle= voomhexq1 <= 0.05
+affyhexqle= affyhexq1 <= 0.05
+
+vennDiagram(vennCounts(cbind(edgerhexqle,voomhexqle, affyhexqle),include="both"),
+            names=c("EdgeRQ", "VoomQ", "AffyQ"))
+```
+
+
+
+
+*f) Do a **hexplom** plot of AA samples 1 and 2 for the microarray and RNA-seq data.  Do they match up well?  Repeat for CT samples 1 and 2.*
+
+No, the microarray samples appear to be more strongly correlated with one another. The RNA-seq samples have numerous data points that stray from the line of y=x, while the microarray data are tightly centered around it.
+
+```{r hexplom AA and CT}
+
+rnaAA1=log2(d$counts[,1]+.25)
+rnaAA2=log2(d$counts[,2]+.25)
+affyAA1=log2(ratexprs[,1])
+affyAA2=log2(ratexprs[,2])
+rnaCT1=log2(d$counts[,5]+.25)
+rnaCT2=log2(d$counts[,6]+.25)
+affyCt1=log2(ratexprs[,5])
+affyct2=log2(ratexprs[,6])
+
+dfCTaffy=data.frame(affyCt1,affyct2)
+dfCTrna=data.frame(rnaCT1,rnaCT2)
+
+dfAArna=data.frame(rnaAA1,rnaAA2)
+dfAffy=data.frame(affyAA1,affyAA2)
+
+par(mfrow=c(1,4))
+hexplom(dfCTaffy)
+hexplom(dfCTrna)
+hexplom(dfAArna)
+hexplom(dfAffy)
+
+
+
+```
+
+
+
+
+*g) Summarize your assessment of the match between the results of the microarray and RNA-seq data.*
+
+The Venn diagram that depicts the q-values of detected differentially expressions genes seems to somewhat align with the findings of Su et al. RNA-seq detected a total of 2748 significantly expressed genes, 892 of which were not found by microarray. Both methods were able to detect 1856 similar DEgenes. I would expect more DEgenes to be detected by RNA-seq methods because they are not limited to a known gene list like microarray methods are. Also, Su et al found that RNA-seq had more unique results. Our methods did show that ~40% of genes were detected by both methods which does align with Su et al's findings. However, we did the original matching to available microarray probe IDs; this is likely why the microarray method yielded 2167 unique results. In any case, these results show that RNA-seq is capable of producing at least ~40% of the same results as the gold-standard microarray tech, and that it can detect unique differentially expressed genes that microarrys cannot.
+
+***************
+
+
+#SessionInfo
+
+```{r sessionInfo}
+sessionInfo()
+
+print(gc())
+```
+ 
+
+
+
+
+
